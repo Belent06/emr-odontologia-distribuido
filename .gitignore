@@ -58,3 +58,6 @@ Thumbs.db
 crash.log
 override.tf
 override.tf.json
+
+vite.config.*.timestamp*
+vitest.config.*.timestamp*
