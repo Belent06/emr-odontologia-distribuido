@@ -7,7 +7,7 @@ interface Patient {
   firstName: string;
   lastName: string;
   phone: string;
-  cedula: string; // <--- CAMBIO: Antes era govId
+  cedula: string;
   email: string;
   birthDate: string;
 }
@@ -15,15 +15,13 @@ interface Patient {
 export function PatientsList() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
 
+  // Eliminamos el estado 'error' que no usábamos mucho para simplificar
   const [showForm, setShowForm] = useState(false);
-
-  // Estado del formulario corregido
   const [newPatient, setNewPatient] = useState({
     firstName: '',
     lastName: '',
-    cedula: '', // <--- CAMBIO: Antes era govId
+    cedula: '',
     phone: '',
     email: '',
     birthDate: '',
@@ -54,7 +52,6 @@ export function PatientsList() {
       setLoading(false);
     } catch (err) {
       console.error(err);
-      setError('Error al cargar datos.');
       setLoading(false);
     }
   };
@@ -62,22 +59,16 @@ export function PatientsList() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      // 1. Validamos manualmente la longitud antes de enviar para evitar el error del servidor
       if (newPatient.cedula.length !== 10) {
         alert('⚠️ La cédula debe tener exactamente 10 dígitos.');
         return;
       }
-
-      console.log('Enviando datos:', newPatient);
-
       await axios.post(
         'http://localhost:3333/api/patients',
         newPatient,
         authConfig,
       );
-
       setShowForm(false);
-      // Limpiamos el formulario
       setNewPatient({
         firstName: '',
         lastName: '',
@@ -87,17 +78,40 @@ export function PatientsList() {
         birthDate: '',
       });
       fetchPatients();
-      alert('Paciente creado con éxito ✅');
+      alert('Paciente creado ✅');
     } catch (err: any) {
-      console.error(err);
-      const backendMessage =
-        err.response?.data?.message || 'Error al crear paciente';
-      // Muestra el error exacto que envía el backend
-      alert(
-        `❌ Error: ${Array.isArray(backendMessage) ? backendMessage.join(', ') : backendMessage}`,
-      );
+      const msg = err.response?.data?.message || 'Error al crear';
+      alert(`❌ Error: ${Array.isArray(msg) ? msg.join(', ') : msg}`);
     }
   };
+
+  // --- FUNCIÓN NUEVA: BORRAR ---
+  const handleDelete = async (id: string) => {
+    // 1. Preguntar confirmación (Importante para no borrar por error)
+    if (
+      !window.confirm(
+        '¿Estás seguro de eliminar a este paciente? Esta acción no se puede deshacer.',
+      )
+    ) {
+      return;
+    }
+
+    try {
+      // 2. Llamar al backend
+      await axios.delete(
+        `http://localhost:3333/api/patients/${id}`,
+        authConfig,
+      );
+
+      // 3. Recargar la lista
+      alert('Paciente eliminado 🗑️');
+      fetchPatients();
+    } catch (error) {
+      console.error(error);
+      alert('Error al eliminar paciente');
+    }
+  };
+  // -----------------------------
 
   if (loading) return <p>Cargando...</p>;
 
@@ -105,7 +119,7 @@ export function PatientsList() {
     <div
       style={{
         padding: '40px',
-        maxWidth: '900px',
+        maxWidth: '1000px',
         margin: '0 auto',
         fontFamily: 'Arial, sans-serif',
       }}
@@ -189,19 +203,16 @@ export function PatientsList() {
               }
               style={{ padding: '8px' }}
             />
-
-            {/* INPUT DE CÉDULA CORREGIDO 👇 */}
             <input
               placeholder="Cédula (10 dígitos)"
               required
-              maxLength={10} // Ayuda visual
+              maxLength={10}
               value={newPatient.cedula}
               onChange={(e) =>
                 setNewPatient({ ...newPatient, cedula: e.target.value })
               }
               style={{ padding: '8px' }}
             />
-
             <input
               placeholder="Teléfono"
               required
@@ -211,7 +222,6 @@ export function PatientsList() {
               }
               style={{ padding: '8px' }}
             />
-
             <input
               type="email"
               placeholder="Email"
@@ -221,22 +231,15 @@ export function PatientsList() {
               }
               style={{ padding: '8px' }}
             />
-
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
-              <label style={{ fontSize: '0.8rem', color: '#666' }}>
-                Fecha de Nacimiento
-              </label>
-              <input
-                type="date"
-                required
-                value={newPatient.birthDate}
-                onChange={(e) =>
-                  setNewPatient({ ...newPatient, birthDate: e.target.value })
-                }
-                style={{ padding: '8px' }}
-              />
-            </div>
-
+            <input
+              type="date"
+              required
+              value={newPatient.birthDate}
+              onChange={(e) =>
+                setNewPatient({ ...newPatient, birthDate: e.target.value })
+              }
+              style={{ padding: '8px' }}
+            />
             <button
               type="submit"
               style={{
@@ -260,10 +263,14 @@ export function PatientsList() {
       >
         <thead>
           <tr style={{ background: '#007bff', color: 'white' }}>
-            <th style={{ padding: '10px' }}>Nombre</th>
-            <th style={{ padding: '10px' }}>Apellido</th>
-            <th style={{ padding: '10px' }}>Cédula</th> {/* Cambiado título */}
-            <th style={{ padding: '10px' }}>Teléfono</th>
+            <th style={{ padding: '10px', textAlign: 'left' }}>Nombre</th>
+            <th style={{ padding: '10px', textAlign: 'left' }}>Apellido</th>
+            <th style={{ padding: '10px', textAlign: 'left' }}>Cédula</th>
+            <th style={{ padding: '10px', textAlign: 'left' }}>Teléfono</th>
+            <th style={{ padding: '10px', textAlign: 'center' }}>
+              Acciones
+            </th>{' '}
+            {/* Columna Nueva */}
           </tr>
         </thead>
         <tbody>
@@ -271,9 +278,24 @@ export function PatientsList() {
             <tr key={patient.id} style={{ borderBottom: '1px solid #ddd' }}>
               <td style={{ padding: '10px' }}>{patient.firstName}</td>
               <td style={{ padding: '10px' }}>{patient.lastName}</td>
-              <td style={{ padding: '10px' }}>{patient.cedula}</td>{' '}
-              {/* Cambiado dato */}
+              <td style={{ padding: '10px' }}>{patient.cedula}</td>
               <td style={{ padding: '10px' }}>{patient.phone}</td>
+              {/* Botón de borrar 👇 */}
+              <td style={{ padding: '10px', textAlign: 'center' }}>
+                <button
+                  onClick={() => handleDelete(patient.id)}
+                  style={{
+                    padding: '5px 10px',
+                    background: 'red',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Eliminar
+                </button>
+              </td>
             </tr>
           ))}
         </tbody>
