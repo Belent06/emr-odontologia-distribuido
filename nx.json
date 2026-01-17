@@ -38,7 +38,11 @@
       "options": {
         "targetName": "test"
       },
-      "exclude": ["apps/svc-patients-e2e/**/*", "apps/svc-auth-e2e/**/*"]
+      "exclude": [
+        "apps/svc-patients-e2e/**/*",
+        "apps/svc-auth-e2e/**/*",
+        "apps/api-gateway-e2e/**/*"
+      ]
     },
     {
       "plugin": "@nx/vite/plugin",

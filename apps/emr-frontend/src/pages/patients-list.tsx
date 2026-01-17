@@ -66,7 +66,7 @@ export function PatientsList() {
   const fetchPatients = async () => {
     try {
       const response = await axios.get<IPatient[]>(
-        'http://localhost:3333/api/patients',
+        'http://localhost:3080/api/patients',
         authConfig,
       );
       setPatients(response.data);
@@ -117,14 +117,14 @@ export function PatientsList() {
 
       if (editingId) {
         await axios.patch(
-          `http://localhost:3333/api/patients/${editingId}`,
+          `http://localhost:3080/api/patients/${editingId}`,
           formData,
           authConfig,
         );
       } else {
         // CORRECCIÓN AQUÍ: Comillas simples en ambos lados
         await axios.post(
-          'http://localhost:3333/api/patients',
+          'http://localhost:3080/api/patients',
           formData,
           authConfig,
         );
@@ -142,7 +142,7 @@ export function PatientsList() {
     if (!window.confirm('¿Eliminar paciente?')) return;
     try {
       await axios.delete(
-        `http://localhost:3333/api/patients/${id}`,
+        `http://localhost:3080/api/patients/${id}`,
         authConfig,
       );
       fetchPatients();
