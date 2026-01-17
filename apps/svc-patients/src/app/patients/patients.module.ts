@@ -1,17 +1,29 @@
 import { Module } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm'; // <--- Importante
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClientsModule, Transport } from '@nestjs/microservices'; // 👈 Importar esto
 import { PatientsService } from './patients.service';
 import { PatientsController } from './patients.controller';
-import { Patient } from './entities/patient.entity'; // <--- Importante
+import { Patient } from './entities/patient.entity';
 
 @Module({
   imports: [
-    // ESTA ES LA LÍNEA QUE TE FALTA O ESTÁ FALLANDO:
     TypeOrmModule.forFeature([Patient]),
+    // 👇 REGISTRAMOS EL CLIENTE DE RABBITMQ 👇
+    ClientsModule.register([
+      {
+        name: 'PATIENT_SERVICE',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://guest:guest@localhost:5672'],
+          queue: 'patients_queue',
+          queueOptions: {
+            durable: false,
+          },
+        },
+      },
+    ]),
   ],
   controllers: [PatientsController],
   providers: [PatientsService],
-  // Exportamos el servicio por si otros módulos lo necesitan en el futuro
-  exports: [PatientsService],
 })
 export class PatientsModule {}

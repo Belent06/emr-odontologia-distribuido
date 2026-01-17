@@ -41,7 +41,8 @@
       "exclude": [
         "apps/svc-patients-e2e/**/*",
         "apps/svc-auth-e2e/**/*",
-        "apps/api-gateway-e2e/**/*"
+        "apps/api-gateway-e2e/**/*",
+        "apps/svc-history-e2e/**/*"
       ]
     },
     {
