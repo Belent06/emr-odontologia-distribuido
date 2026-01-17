@@ -35,5 +35,19 @@ services:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
 
+  # 4. MongoDB - Base de datos para Historias Clínicas (NUEVO)
+  emr-mongodb:
+    image: mongo:latest
+    container_name: emr-mongodb
+    restart: always
+    ports:
+      - '27017:27017'
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: adminpassword
+    volumes:
+      - mongo_data:/data/db
+
 volumes:
   postgres_data:
+  mongo_data:
