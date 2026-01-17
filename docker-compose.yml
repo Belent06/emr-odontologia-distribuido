@@ -1,0 +1,17 @@
+services:
+  db-patients:
+    image: postgres:15-alpine
+    container_name: emr-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: emr_patients_db
+    ports:
+      # CAMBIO CLAVE: El puerto de afuera (host) será 5435
+      - '5435:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
