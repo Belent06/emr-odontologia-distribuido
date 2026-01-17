@@ -1,4 +1,10 @@
-import { IsString, IsEmail, IsOptional, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  MinLength,
+  IsOptional,
+  IsDateString,
+} from 'class-validator';
 
 // Interfaz pura (para el Frontend)
 export interface IPatient {
@@ -15,7 +21,8 @@ export interface IPatient {
 // DTO para crear (Backend valida esto)
 export class CreatePatientDto {
   @IsString()
-  cedula!: string;
+  @MinLength(10, { message: 'La cédula debe tener 10 dígitos' })
+  cedula!: string; // <--- MANTÉN EL SIGNO DE EXCLAMACIÓN
 
   @IsString()
   firstName!: string;
@@ -23,14 +30,14 @@ export class CreatePatientDto {
   @IsString()
   lastName!: string;
 
-  @IsDateString()
-  birthDate!: string; // Se recibe como ISO String YYYY-MM-DD
+  @IsDateString({}, { message: 'La fecha debe ser formato YYYY-MM-DD' })
+  birthDate!: string;
 
-  @IsEmail()
+  @IsEmail({}, { message: 'El email no es válido' })
   email!: string;
 
-  @IsOptional()
   @IsString()
+  @IsOptional()
   phone?: string;
 }
 
@@ -43,6 +50,10 @@ export class UpdatePatientDto {
   @IsOptional()
   @IsString()
   lastName?: string;
+
+  @IsOptional()
+  @IsDateString()
+  birthDate?: string;
 
   @IsOptional()
   @IsEmail()
