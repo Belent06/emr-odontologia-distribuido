@@ -40,3 +40,21 @@ Thumbs.db
 
 .nx/cache
 .nx/workspace-data
+
+# --- TERRAFORM ---
+# Carpeta de plugins y estado local
+.terraform/
+.terraform.lock.hcl
+
+# Archivos de estado (State) - ¡MUY IMPORTANTE NO SUBIRLOS!
+*.tfstate
+*.tfstate.backup
+
+# Variables con secretos (si llegamos a usarlas)
+*.tfvars
+*.auto.tfvars
+
+# Logs de error
+crash.log
+override.tf
+override.tf.json
