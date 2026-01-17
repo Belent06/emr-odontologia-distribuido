@@ -1,10 +1,4 @@
-import {
-  IsString,
-  IsEmail,
-  IsOptional,
-  IsDateString,
-  IsUUID,
-} from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsDateString } from 'class-validator';
 
 // Interfaz pura (para el Frontend)
 export interface IPatient {
