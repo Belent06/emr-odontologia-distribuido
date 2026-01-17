@@ -1,8 +1,3 @@
-/**
- * This is not a production server yet!
- * This is only a minimal backend to get started.
- */
-
 import { Logger, ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app/app.module';
@@ -13,18 +8,22 @@ async function bootstrap() {
   const globalPrefix = 'api';
   app.setGlobalPrefix(globalPrefix);
 
-  // 2. ACTIVAR LA VALIDACIÓN GLOBALMENTE
+  // 1. CORS ACTIVADO
+  app.enableCors();
+
   app.useGlobalPipes(
     new ValidationPipe({
-      whitelist: true, // Elimina datos que no estén en el DTO (limpieza)
-      forbidNonWhitelisted: true, // Tira error si envían basura extra
+      whitelist: true,
+      forbidNonWhitelisted: true,
     }),
   );
 
-  const port = process.env.PORT || 3000;
+  // 2. PUERTO CAMBIADO A 3333
+  const port = process.env.PORT || 3333;
+
   await app.listen(port);
   Logger.log(
-    `🚀 Application is running on: http://localhost:${port}/${globalPrefix}`,
+    `🚀 svc-patients is running on: http://localhost:${port}/${globalPrefix}`,
   );
 }
 
