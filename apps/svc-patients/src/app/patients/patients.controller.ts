@@ -6,11 +6,14 @@ import {
   Patch,
   Param,
   Delete,
+  UseGuards,
 } from '@nestjs/common';
 import { PatientsService } from './patients.service';
 // IMPORTACIÓN CORRECTA: Usamos la librería compartida (DRY)
 import { CreatePatientDto, UpdatePatientDto } from '@emr/shared-dtos';
+import { AuthGuard } from '@nestjs/passport';
 
+@UseGuards(AuthGuard('jwt'))
 @Controller('patients')
 export class PatientsController {
   constructor(private readonly patientsService: PatientsService) {}

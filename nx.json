@@ -38,7 +38,7 @@
       "options": {
         "targetName": "test"
       },
-      "exclude": ["apps/svc-patients-e2e/**/*"]
+      "exclude": ["apps/svc-patients-e2e/**/*", "apps/svc-auth-e2e/**/*"]
     }
   ],
   "targetDefaults": {
