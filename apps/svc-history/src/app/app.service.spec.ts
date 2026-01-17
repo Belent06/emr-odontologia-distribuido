@@ -1,20 +1,30 @@
-import { Test } from '@nestjs/testing';
+import { Test, TestingModule } from '@nestjs/testing';
 import { AppService } from './app.service';
+import { getModelToken } from '@nestjs/mongoose';
+import { PatientHistory } from './schemas/patient-history.schema';
 
 describe('AppService', () => {
   let service: AppService;
 
-  beforeAll(async () => {
-    const app = await Test.createTestingModule({
-      providers: [AppService],
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        AppService,
+        {
+          provide: getModelToken(PatientHistory.name),
+          useValue: {
+            new: jest.fn().mockResolvedValue({}),
+            constructor: jest.fn().mockResolvedValue({}),
+            save: jest.fn(),
+          },
+        },
+      ],
     }).compile();
 
-    service = app.get<AppService>(AppService);
+    service = module.get<AppService>(AppService);
   });
 
-  describe('getData', () => {
-    it('should return "Hello API"', () => {
-      expect(service.getData()).toEqual({ message: 'Hello API' });
-    });
+  it('should be defined', () => {
+    expect(service).toBeDefined();
   });
 });
