@@ -52,6 +52,11 @@ export class UpdatePatientDto {
   lastName?: string;
 
   @IsOptional()
+  @IsString()
+  @MinLength(10) // Mantén la validación por si deciden corregirla
+  cedula?: string;
+
+  @IsOptional()
   @IsDateString()
   birthDate?: string;
 
