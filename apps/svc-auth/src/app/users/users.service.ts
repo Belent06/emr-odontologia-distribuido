@@ -8,7 +8,7 @@ import { UpdateUserDto } from './dto/update-user.dto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { User } from './entities/user.entity';
-import * as bcrypt from 'bcrypt'; // <--- La librería de seguridad
+import * as bcrypt from 'bcrypt';
 
 @Injectable()
 export class UsersService {
@@ -19,19 +19,23 @@ export class UsersService {
 
   async create(createUserDto: CreateUserDto) {
     try {
-      const { password, ...userData } = createUserDto;
+      // 1. Extraemos email y password explícitamente
+      const { password, email, ...userData } = createUserDto;
 
-      // 1. Encriptar la contraseña
-      // El "salt" (10) añade aleatoriedad para que dos passwords iguales tengan hash distintos
+      // 2. Creamos la entidad
       const user = this.userRepository.create({
         ...userData,
+        email, // Guardamos el email
+        // ---> FIX CRÍTICO AQUÍ <---
+        username: email, // Usamos el email como username para satisfacer a la BD
+        // -------------------------
         password: bcrypt.hashSync(password, 10),
       });
 
-      // 2. Guardar en base de datos
+      // 3. Guardar en base de datos
       await this.userRepository.save(user);
 
-      // 3. Limpiar la respuesta (¡NUNCA devolver la contraseña!)
+      // 4. Limpiar la respuesta (¡NUNCA devolver la contraseña!)
       delete user.password;
       return user;
     } catch (error) {
@@ -54,8 +58,6 @@ export class UsersService {
   async findOneByUsername(username: string) {
     return this.userRepository.findOne({
       where: { username },
-      // Necesitamos el password para verificarlo en el login,
-      // así que seleccionamos explícitamente los campos si fuera necesario
     });
   }
 
@@ -70,7 +72,7 @@ export class UsersService {
   // Manejo de errores centralizado
   private handleDBErrors(error: any): never {
     if (error.code === '23505') {
-      throw new BadRequestException('El nombre de usuario ya existe');
+      throw new BadRequestException('El nombre de usuario (o email) ya existe');
     }
     console.log(error);
     throw new InternalServerErrorException(

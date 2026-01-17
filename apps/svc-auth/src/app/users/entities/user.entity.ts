@@ -11,6 +11,9 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
+  @Column('text', { unique: true })
+  email: string;
+
   @Column({ unique: true })
   username: string; // Nombre de usuario (ej: "dr_perez")
 
