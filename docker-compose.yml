@@ -1,17 +1,39 @@
+version: '3.8'
+
 services:
-  db-patients:
-    image: postgres:15-alpine
+  # 1. Base de Datos Principal (Ya la tenías)
+  emr-postgres:
+    image: postgres:15
     container_name: emr-postgres
     restart: always
     environment:
       POSTGRES_USER: admin
       POSTGRES_PASSWORD: adminpassword
-      POSTGRES_DB: emr_patients_db
+      POSTGRES_DB: emr_auth_db
     ports:
-      # CAMBIO CLAVE: El puerto de afuera (host) será 5435
       - '5435:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+
+  # 2. Redis - El sistema de Cache (NUEVO)
+  emr-redis:
+    image: redis:7-alpine
+    container_name: emr-redis
+    restart: always
+    ports:
+      - '6379:6379'
+
+  # 3. RabbitMQ - El Message Broker (NUEVO)
+  emr-rabbitmq:
+    image: rabbitmq:3-management
+    container_name: emr-rabbitmq
+    restart: always
+    ports:
+      - '5672:5672' # Puerto de comunicación de datos
+      - '15672:15672' # Puerto del Panel de Control (Dashboard)
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
 
 volumes:
   postgres_data:

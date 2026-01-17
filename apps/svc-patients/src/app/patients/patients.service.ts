@@ -1,39 +1,74 @@
 import {
   BadRequestException,
   Injectable,
+  Inject,
   InternalServerErrorException,
   NotFoundException,
 } from '@nestjs/common';
+import { ClientProxy } from '@nestjs/microservices';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-// Asegúrate de que esta ruta coincida con tu tsconfig (puede ser @emr-odontologia/shared-dtos o @emr/shared-dtos)
 import { CreatePatientDto, UpdatePatientDto } from '@emr/shared-dtos';
 import { Patient } from './entities/patient.entity';
+import { CACHE_MANAGER } from '@nestjs/cache-manager'; // 👈 Asegúrate de que esté
+import { Cache } from 'cache-manager';
 
 @Injectable()
 export class PatientsService {
+  private readonly CACHE_KEY = 'patients_list'; // Nombre de la "llave" en Redis
+
   constructor(
     @InjectRepository(Patient)
     private readonly patientRepository: Repository<Patient>,
+
+    @Inject('PATIENT_SERVICE')
+    private readonly client: ClientProxy,
+
+    // 👇 INYECTAMOS EL MANEJADOR DE CACHÉ 👇
+    @Inject(CACHE_MANAGER)
+    private cacheManager: Cache,
   ) {}
 
   async create(createPatientDto: CreatePatientDto): Promise<Patient> {
     try {
-      // 1. Crear la instancia convirtiendo la fecha explícitamente
       const patient = this.patientRepository.create({
         ...createPatientDto,
-        birthDate: new Date(createPatientDto.birthDate), // <--- CORRECCIÓN CLAVE
+        birthDate: new Date(createPatientDto.birthDate),
       });
 
-      // 2. Intentar guardar en Base de Datos
-      return await this.patientRepository.save(patient);
+      const savedPatient = await this.patientRepository.save(patient);
+
+      // 📣 Evento RabbitMQ
+      this.client.emit('patient_created', savedPatient);
+
+      // 🧹 INVALIDAR CACHÉ: Borramos la lista vieja porque hay un nuevo paciente
+      await this.cacheManager.del(this.CACHE_KEY);
+
+      return savedPatient;
     } catch (error) {
       this.handleDBErrors(error);
     }
   }
 
   async findAll(): Promise<Patient[]> {
-    return await this.patientRepository.find();
+    // 1. Intentar obtener de Redis
+    const cachedPatients = await this.cacheManager.get<Patient[]>(
+      this.CACHE_KEY,
+    );
+
+    if (cachedPatients) {
+      console.log('⚡ [REDIS] Retornando lista desde Caché');
+      return cachedPatients;
+    }
+
+    // 2. Si no existe, ir a Postgres
+    console.log('📦 [POSTGRES] Consultando Base de Datos...');
+    const patients = await this.patientRepository.find();
+
+    // 3. Guardar en Redis por 60 segundos (60000 ms)
+    await this.cacheManager.set(this.CACHE_KEY, patients, 60000);
+
+    return patients;
   }
 
   async findOne(id: string): Promise<Patient> {
@@ -48,11 +83,9 @@ export class PatientsService {
     id: string,
     updatePatientDto: UpdatePatientDto,
   ): Promise<Patient> {
-    const patient = await this.findOne(id); // Verifica si existe primero
+    const patient = await this.findOne(id);
 
-    // Si viene fecha en la actualización, la convertimos también
     if (updatePatientDto.birthDate) {
-      // Truco para que TypeScript no se queje al asignar Date a lo que antes era string en el DTO
       (updatePatientDto as any).birthDate = new Date(
         updatePatientDto.birthDate,
       );
@@ -60,7 +93,12 @@ export class PatientsService {
 
     try {
       this.patientRepository.merge(patient, updatePatientDto);
-      return await this.patientRepository.save(patient);
+      const updatedPatient = await this.patientRepository.save(patient);
+
+      // 🧹 INVALIDAR CACHÉ: Al actualizar, la lista vieja ya no sirve
+      await this.cacheManager.del(this.CACHE_KEY);
+
+      return updatedPatient;
     } catch (error) {
       this.handleDBErrors(error);
     }
@@ -69,21 +107,16 @@ export class PatientsService {
   async remove(id: string): Promise<void> {
     const patient = await this.findOne(id);
     await this.patientRepository.remove(patient);
+
+    // 🧹 INVALIDAR CACHÉ: El paciente eliminado ya no debe aparecer en la lista
+    await this.cacheManager.del(this.CACHE_KEY);
   }
 
-  // --- MÉTODO PRIVADO PARA MANEJAR ERRORES ---
   private handleDBErrors(error: any): never {
-    // El código '23505' en PostgreSQL significa "Violación de llave única" (Unique Constraint)
-    // Esto pasa si intentas registrar una Cédula o Email que ya existen.
     if (error.code === '23505') {
-      throw new BadRequestException(
-        'El paciente ya existe (Verifica la cédula o el email)',
-      );
+      throw new BadRequestException('El paciente ya existe');
     }
-
-    console.error(error); // Imprimimos el error rojo en consola para que tú lo veas
-    throw new InternalServerErrorException(
-      'Error inesperado al procesar la solicitud',
-    );
+    console.error(error);
+    throw new InternalServerErrorException('Error inesperado');
   }
 }
