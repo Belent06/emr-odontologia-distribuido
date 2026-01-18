@@ -10,21 +10,21 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { CreatePatientDto, UpdatePatientDto } from '@emr/shared-dtos';
 import { Patient } from './entities/patient.entity';
-import { CACHE_MANAGER } from '@nestjs/cache-manager'; // 👈 Asegúrate de que esté
+import { CACHE_MANAGER } from '@nestjs/cache-manager';
 import { Cache } from 'cache-manager';
 
 @Injectable()
 export class PatientsService {
-  private readonly CACHE_KEY = 'patients_list'; // Nombre de la "llave" en Redis
+  private readonly CACHE_KEY = 'patients_list';
 
   constructor(
     @InjectRepository(Patient)
     private readonly patientRepository: Repository<Patient>,
 
-    @Inject('PATIENT_SERVICE')
-    private readonly client: ClientProxy,
+    // 👇 CAMBIO: Usamos 'HISTORY_SERVICE' que es el nombre que definimos en el modulo
+    @Inject('HISTORY_SERVICE')
+    private readonly historyClient: ClientProxy,
 
-    // 👇 INYECTAMOS EL MANEJADOR DE CACHÉ 👇
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,
   ) {}
@@ -38,10 +38,10 @@ export class PatientsService {
 
       const savedPatient = await this.patientRepository.save(patient);
 
-      // 📣 Evento RabbitMQ
-      this.client.emit('patient_created', savedPatient);
+      // 📣 Evento RabbitMQ: Ahora historyClient envía el mensaje 🚀
+      this.historyClient.emit('patient_created', savedPatient);
 
-      // 🧹 INVALIDAR CACHÉ: Borramos la lista vieja porque hay un nuevo paciente
+      // 🧹 INVALIDAR CACHÉ
       await this.cacheManager.del(this.CACHE_KEY);
 
       return savedPatient;
@@ -51,21 +51,16 @@ export class PatientsService {
   }
 
   async findAll(): Promise<Patient[]> {
-    // 1. Intentar obtener de Redis
     const cachedPatients = await this.cacheManager.get<Patient[]>(
       this.CACHE_KEY,
     );
-
     if (cachedPatients) {
       console.log('⚡ [REDIS] Retornando lista desde Caché');
       return cachedPatients;
     }
 
-    // 2. Si no existe, ir a Postgres
     console.log('📦 [POSTGRES] Consultando Base de Datos...');
     const patients = await this.patientRepository.find();
-
-    // 3. Guardar en Redis por 60 segundos (60000 ms)
     await this.cacheManager.set(this.CACHE_KEY, patients, 60000);
 
     return patients;
@@ -84,7 +79,6 @@ export class PatientsService {
     updatePatientDto: UpdatePatientDto,
   ): Promise<Patient> {
     const patient = await this.findOne(id);
-
     if (updatePatientDto.birthDate) {
       (updatePatientDto as any).birthDate = new Date(
         updatePatientDto.birthDate,
@@ -94,10 +88,7 @@ export class PatientsService {
     try {
       this.patientRepository.merge(patient, updatePatientDto);
       const updatedPatient = await this.patientRepository.save(patient);
-
-      // 🧹 INVALIDAR CACHÉ: Al actualizar, la lista vieja ya no sirve
       await this.cacheManager.del(this.CACHE_KEY);
-
       return updatedPatient;
     } catch (error) {
       this.handleDBErrors(error);
@@ -107,8 +98,6 @@ export class PatientsService {
   async remove(id: string): Promise<void> {
     const patient = await this.findOne(id);
     await this.patientRepository.remove(patient);
-
-    // 🧹 INVALIDAR CACHÉ: El paciente eliminado ya no debe aparecer en la lista
     await this.cacheManager.del(this.CACHE_KEY);
   }
 

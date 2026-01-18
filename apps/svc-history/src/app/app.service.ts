@@ -1,4 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { PatientHistory } from './schemas/patient-history.schema';
@@ -12,72 +16,89 @@ export class AppService {
     private historyModel: Model<PatientHistory>,
   ) {}
 
-  // 1. Crear historia inicial (Tu código original - Intacto)
   async createInitialHistory(patientData: any) {
-    const newHistory = new this.historyModel({
-      patientId: patientData.id,
-      patientName: patientData.firstName || patientData.name,
-      medicalNotes: [
-        {
-          date: new Date(),
-          content: 'Expediente creado automáticamente por el sistema.',
-          doctorId: 'SYSTEM',
-        },
-      ],
-    });
-
-    const saved = await newHistory.save();
-    this.logger.log(
-      `💾 Historia guardada en MongoDB para: ${saved.patientName}`,
-    );
-    return saved;
-  }
-
-  // 2. BUSCAR TODAS LAS HISTORIAS (Tu código original - Intacto)
-  async findAll() {
-    this.logger.log('🔍 Consultando todas las historias en MongoDB...');
-    return this.historyModel.find().exec();
-  }
-
-  // 👇 3. NUEVO MÉTODO AGREGADO: Procesa el evento de Cita Completada 🚀
-  async addEntryFromAppointment(data: any) {
-    this.logger.log(
-      `📩 Recibiendo datos de cita para paciente: ${data.patientId}`,
-    );
-
-    // A. Buscamos el historial existente
-    let history = await this.historyModel.findOne({
-      patientId: data.patientId,
-    });
-
-    // B. Si NO existe (ej. pacientes viejos), lo creamos al vuelo (Fail-safe)
-    if (!history) {
-      this.logger.warn(
-        `⚠️ No existía historial para ${data.patientId}. Creando uno nuevo...`,
-      );
-      history = new this.historyModel({
-        patientId: data.patientId,
-        patientName: 'Paciente (Generado por Cita)', // No tenemos el nombre aquí, ponemos un placeholder
-        medicalNotes: [],
+    try {
+      const newHistory = new this.historyModel({
+        patientId: patientData.id,
+        patientName: patientData.firstName || patientData.name,
+        medicalNotes: [
+          {
+            date: new Date(),
+            content: 'Expediente creado automáticamente por el sistema.',
+            doctorId: 'SYSTEM',
+          },
+        ],
       });
+
+      const saved = await newHistory.save();
+      this.logger.log(
+        `💾 Historia guardada en MongoDB para: ${saved.patientName}`,
+      );
+      return saved;
+    } catch (error) {
+      this.logger.error(`❌ Error al crear historia inicial: ${error.message}`);
+      throw error;
     }
+  }
 
-    // C. Creamos la nota médica basada en la cita
-    const newNote = {
-      date: new Date(),
-      content: `Cita Finalizada. Motivo: ${data.reason}. Detalles: ${data.notes || 'Sin notas adicionales'}`,
-      doctorId: data.doctorId,
-    };
+  async findAll() {
+    this.logger.log('🔍 [AppService] Iniciando búsqueda en MongoDB...');
+    try {
+      const histories = await this.historyModel.find().lean().exec();
 
-    // D. Empujamos al array 'medicalNotes' (que es como se llama en tu esquema)
-    // Usamos 'any' temporalmente si TypeScript se queja del tipo estricto,
-    // pero idealmente tu Schema ya define esta estructura.
-    history.medicalNotes.push(newNote as any);
+      // 💡 TRUCO: Convertimos a string y luego a JSON para eliminar cualquier
+      // rastro de tipos complejos de Mongoose que puedan trabar a RabbitMQ.
+      const cleanData = JSON.parse(JSON.stringify(histories));
 
-    const saved = await history.save();
-    this.logger.log(
-      `✅ Entrada médica agregada exitosamente para el paciente ${data.patientId}`,
-    );
-    return saved;
+      this.logger.log(
+        `✅ [AppService] Búsqueda finalizada. Documentos encontrados: ${cleanData.length}`,
+      );
+      return cleanData;
+    } catch (error) {
+      this.logger.error(
+        `❌ [AppService] Error crítico en MongoDB: ${error.message}`,
+      );
+      return [];
+    }
+  }
+
+  async addEntryFromAppointment(data: any) {
+    try {
+      this.logger.log(
+        `📩 Recibiendo datos de cita para paciente: ${data.patientId}`,
+      );
+
+      let history = await this.historyModel.findOne({
+        patientId: data.patientId,
+      });
+
+      if (!history) {
+        this.logger.warn(
+          `⚠️ No existía historial para ${data.patientId}. Creando uno nuevo...`,
+        );
+        history = new this.historyModel({
+          patientId: data.patientId,
+          patientName: 'Paciente (Generado por Cita)',
+          medicalNotes: [],
+        });
+      }
+
+      const newNote = {
+        date: new Date(),
+        content: `Cita Finalizada. Motivo: ${data.reason}. Detalles: ${data.notes || 'Sin notas adicionales'}`,
+        doctorId: data.doctorId,
+      };
+
+      history.medicalNotes.push(newNote as any);
+      const saved = await history.save();
+
+      this.logger.log(
+        `✅ Entrada médica agregada exitosamente para el paciente ${data.patientId}`,
+      );
+      return saved;
+    } catch (error) {
+      this.logger.error(`❌ Error al agregar entrada médica: ${error.message}`);
+      throw error;
+    }
   }
 }

@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { CacheModule } from '@nestjs/cache-manager'; // 👈 Importar CacheModule
-import { redisStore } from 'cache-manager-redis-yet'; // 👈 Importar el store de Redis
+import { CacheModule } from '@nestjs/cache-manager';
+import { redisStore } from 'cache-manager-redis-yet';
 import { PassportModule } from '@nestjs/passport';
+import { ClientsModule, Transport } from '@nestjs/microservices'; // 👈 Importar esto
 
 import { PatientsModule } from './patients/patients.module';
 import { Patient } from './patients/entities/patient.entity';
@@ -23,25 +24,26 @@ import { JwtStrategy } from './auth/jwt.strategy';
       autoLoadEntities: true,
     }),
 
-    // 2. CONFIGURACIÓN DE CACHÉ (REDIS) - NUEVO
-    // isGlobal: true permite que el caché se use en PatientsService sin volver a importarlo
+    // 2. CONFIGURACIÓN DE CACHÉ (REDIS)
     CacheModule.registerAsync({
       isGlobal: true,
       useFactory: async () => ({
         store: await redisStore({
           socket: {
             host: 'localhost',
-            port: 6379, // Puerto por defecto de Redis
+            port: 6379,
           },
-          // TTL (Time To Live): Cuánto tiempo viven los datos en caché (ej: 60 seg)
           ttl: 60000,
         }),
       }),
     }),
 
+    // 👇 3. REGISTRAMOS EL CLIENTE DE RABBITMQ PARA HISTORIAS
+    // Lo registramos aquí para que esté disponible en todo el microservicio
+
     PatientsModule,
 
-    // 3. SEGURIDAD (PASSPORT)
+    // 4. SEGURIDAD (PASSPORT)
     PassportModule.register({ defaultStrategy: 'jwt' }),
   ],
   controllers: [],
