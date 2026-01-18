@@ -1,23 +1,14 @@
-import { Controller, Post, Body, UnauthorizedException } from '@nestjs/common';
+import { Controller, Post, Body } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 @Controller('auth')
 export class AuthController {
-  constructor(private authService: AuthService) {}
+  constructor(private readonly authService: AuthService) {}
 
   @Post('login')
-  async login(@Body() req) {
-    // 1. Validamos usuario y contraseña
-    const user = await this.authService.validateUser(
-      req.username,
-      req.password,
-    );
-
-    if (!user) {
-      throw new UnauthorizedException('Credenciales inválidas');
-    }
-
-    // 2. Si es válido, entregamos el token
-    return this.authService.login(user);
+  async login(@Body() loginDto: any) {
+    // 🚀 Llamamos directamente al método login del servicio.
+    // Este método ya valida las credenciales y genera el JWT.
+    return this.authService.login(loginDto);
   }
 }

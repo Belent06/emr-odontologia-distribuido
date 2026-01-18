@@ -17,6 +17,14 @@ export class UsersService {
     private readonly userRepository: Repository<User>,
   ) {}
 
+  async findOneByEmail(email: string) {
+    return await this.userRepository.findOne({
+      where: { email },
+      // Como pusimos 'select: false' en la entidad, aquí debemos pedirla explícitamente para validar
+      select: ['id', 'email', 'password', 'roles', 'name'],
+    });
+  }
+
   async create(createUserDto: CreateUserDto) {
     try {
       // 1. Extraemos email y password explícitamente
