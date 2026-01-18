@@ -11,19 +11,23 @@ export class User {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column('text', { unique: true })
+  @Column({ unique: true })
   email: string;
 
   @Column({ unique: true })
-  username: string; // Nombre de usuario (ej: "dr_perez")
+  username: string;
 
-  @Column()
-  password: string; // Contraseña encriptada (Hash)
+  // 🛡️ 'select: false' evita que el hash de la contraseña se envíe por accidente en listas públicas
+  @Column({ select: false })
+  password: string;
+
+  @Column({ type: 'text', nullable: true })
+  name: string;
 
   @Column({ default: true })
-  isActive: boolean; // Para bloquear usuarios sin borrarlos
+  isActive: boolean;
 
-  // Guardamos los roles como un array simple (ej: "admin,dentist")
+  // 🔑 Guardamos roles como array para manejar permisos múltiples (admin, doctor, etc.)
   @Column('simple-array', { default: 'user' })
   roles: string[];
 
