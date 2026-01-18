@@ -14,10 +14,6 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { Roles } from './auth/roles.decorator';
 
-@Controller() // ⚠️ Nota: Asegúrate de que el decorador sea @Controller() o @Controller('api') según tu preferencia, pero mantén consistencia.
-// Si en main.ts pusiste app.setGlobalPrefix('api'), aquí déjalo como @Controller().
-// Si NO pusiste prefijo global, usa @Controller('api').
-// Asumiré que en main.ts tienes el prefijo global, así que dejo @Controller().
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
@@ -81,10 +77,10 @@ export class AppController {
     return this.appService.proxyDeletePatient(id, authHeader);
   }
 
-  // 👇 --- RUTAS DE AGENDA / APPOINTMENTS (NUEVO) --- 👇
+  // 👇 --- RUTAS DE AGENDA / APPOINTMENTS --- 👇
 
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'doctor', 'receptionist') // ¡Recepcionistas pueden agendar!
+  @Roles('admin', 'doctor', 'receptionist')
   @Post('appointments')
   async createAppointment(
     @Body() appointmentDto: any,
@@ -98,6 +94,18 @@ export class AppController {
   @Get('appointments')
   async getAppointments(@Headers('authorization') authHeader: string) {
     return this.appService.proxyGetAppointments(authHeader);
+  }
+
+  // 👇 NUEVO: Cancelar o Completar Cita
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'doctor', 'receptionist')
+  @Patch('appointments/:id/status')
+  async updateAppointmentStatus(
+    @Param('id') id: string, // ID de la URL
+    @Body('status') status: string, // Nuevo estado
+    @Headers('authorization') authHeader: string,
+  ) {
+    return this.appService.proxyUpdateAppointmentStatus(id, status, authHeader);
   }
 
   // --- HISTORIAL ---

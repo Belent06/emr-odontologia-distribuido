@@ -8,8 +8,7 @@ export class AppService {
   // Asegúrate de que estos puertos sean los CORRECTOS de tus microservicios
   private readonly AUTH_URL = 'http://localhost:3000/api'; // svc-auth
   private readonly PATIENTS_URL = 'http://localhost:3333/api'; // svc-patients
-  // 👇 1. NUEVA URL PARA AGENDA (Puerto 3001)
-  private readonly APPOINTMENTS_URL = 'http://localhost:3001/api';
+  private readonly APPOINTMENTS_URL = 'http://localhost:3001/api'; // svc-appointments
 
   constructor(
     private readonly httpService: HttpService,
@@ -98,13 +97,12 @@ export class AppService {
     }
   }
 
-  // --- 📅 AGENDA / APPOINTMENTS (NUEVO BLOQUE) ---
+  // --- 📅 AGENDA / APPOINTMENTS ---
 
   // Crear Cita
   async proxyCreateAppointment(appointmentDto: any, authHeader: string) {
     try {
       const { data } = await firstValueFrom(
-        // Enviamos al puerto 3001
         this.httpService.post(
           `${this.APPOINTMENTS_URL}/appointments`,
           appointmentDto,
@@ -123,10 +121,29 @@ export class AppService {
   async proxyGetAppointments(authHeader: string) {
     try {
       const { data } = await firstValueFrom(
-        // Pedimos al puerto 3001
         this.httpService.get(`${this.APPOINTMENTS_URL}/appointments`, {
           headers: { Authorization: authHeader },
         }),
+      );
+      return data;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // 👇 NUEVO: Cambiar Estatus de Cita (CANCELAR / COMPLETAR)
+  async proxyUpdateAppointmentStatus(
+    id: string,
+    status: string,
+    authHeader: string,
+  ) {
+    try {
+      const { data } = await firstValueFrom(
+        this.httpService.patch(
+          `${this.APPOINTMENTS_URL}/appointments/${id}/status`,
+          { status }, // Enviamos el estatus en el body
+          { headers: { Authorization: authHeader } },
+        ),
       );
       return data;
     } catch (error) {

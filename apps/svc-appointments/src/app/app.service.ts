@@ -1,7 +1,8 @@
 import {
   Injectable,
   BadRequestException,
-  ConflictException, // 👈 1. Importamos ConflictException (Error 409)
+  ConflictException,
+  NotFoundException, // 👈 1. Agregamos esto para manejar IDs incorrectos
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
@@ -31,8 +32,6 @@ export class AppService {
     }
 
     // --- 🛡️ VALIDACIÓN 1: Disponibilidad del Doctor ---
-    // Buscamos si ESTE doctor ya tiene una cita en ESTA hora exacta
-    // Y que NO esté cancelada.
     const doctorBusy = await this.appointmentRepo
       .createQueryBuilder('appointment')
       .where('appointment.doctorId = :doctorId', { doctorId: data.doctorId })
@@ -47,7 +46,6 @@ export class AppService {
     }
 
     // --- 🛡️ VALIDACIÓN 2: Disponibilidad del Paciente ---
-    // Buscamos si ESTE paciente ya tiene otra cita (con cualquier doctor) a esa hora
     const patientBusy = await this.appointmentRepo
       .createQueryBuilder('appointment')
       .where('appointment.patientId = :patientId', {
@@ -73,5 +71,17 @@ export class AppService {
     });
 
     return this.appointmentRepo.save(newAppointment);
+  }
+
+  // 👇 3. NUEVO MÉTODO: Cambiar Estatus (CANCELLED, COMPLETED, etc.)
+  async updateStatus(id: string, status: string): Promise<Appointment> {
+    const appointment = await this.appointmentRepo.findOne({ where: { id } });
+
+    if (!appointment) {
+      throw new NotFoundException('Cita no encontrada');
+    }
+
+    appointment.status = status;
+    return this.appointmentRepo.save(appointment);
   }
 }
