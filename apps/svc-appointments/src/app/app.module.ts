@@ -1,8 +1,9 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { ClientsModule, Transport } from '@nestjs/microservices'; // 👈 1. Importamos ClientsModule
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-import { Appointment } from './appointment.entity'; // 👈 1. Importar
+import { Appointment } from './appointment.entity';
 
 @Module({
   imports: [
@@ -13,11 +14,26 @@ import { Appointment } from './appointment.entity'; // 👈 1. Importar
       username: 'admin',
       password: 'adminpassword',
       database: 'appointments_db',
-      entities: [Appointment], // 👈 2. Registrar aquí la entidad
-      synchronize: true, // Esto creará la tabla 'appointment' automáticamente
+      entities: [Appointment],
+      synchronize: true,
     }),
-    // 👇 3. También necesitamos esto para usar Repository<Appointment> en el servicio
     TypeOrmModule.forFeature([Appointment]),
+
+    // 👇 2. CONFIGURACIÓN DEL EMISOR RABBITMQ 👇
+    // Esto permite que este microservicio envíe mensajes a la cola 'history_queue'
+    ClientsModule.register([
+      {
+        name: 'HISTORY_SERVICE', // Nombre que usaremos para inyectar en el servicio (@Inject)
+        transport: 5,
+        options: {
+          urls: ['amqp://localhost:5672'], // URL de tu RabbitMQ (Docker)
+          queue: 'history_queue', // La cola que escucha svc-history
+          queueOptions: {
+            durable: false,
+          },
+        },
+      },
+    ]),
   ],
   controllers: [AppController],
   providers: [AppService],

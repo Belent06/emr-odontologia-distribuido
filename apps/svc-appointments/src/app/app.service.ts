@@ -2,10 +2,12 @@ import {
   Injectable,
   BadRequestException,
   ConflictException,
-  NotFoundException, // 👈 1. Agregamos esto para manejar IDs incorrectos
+  NotFoundException,
+  Inject, // 👈 1. Necesario para inyectar el cliente
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ClientProxy } from '@nestjs/microservices'; // 👈 2. Necesario para tipar el cliente
 import { Appointment } from './appointment.entity';
 
 @Injectable()
@@ -13,6 +15,9 @@ export class AppService {
   constructor(
     @InjectRepository(Appointment)
     private readonly appointmentRepo: Repository<Appointment>,
+
+    // 👇 3. INYECTAMOS EL CLIENTE RABBITMQ (Debe coincidir con el nombre en app.module)
+    @Inject('HISTORY_SERVICE') private readonly historyClient: ClientProxy,
   ) {}
 
   // 1. Ver todas las citas
@@ -22,7 +27,7 @@ export class AppService {
     });
   }
 
-  // 2. Crear una Cita con Validaciones de Solapamiento
+  // 2. Crear una Cita con Validaciones
   async create(data: any): Promise<Appointment> {
     const appointmentDate = new Date(data.date);
 
@@ -61,7 +66,7 @@ export class AppService {
       );
     }
 
-    // --- ✅ SI PASA TODAS LAS VALIDACIONES, GUARDAMOS ---
+    // --- ✅ GUARDAR ---
     const newAppointment = this.appointmentRepo.create({
       date: appointmentDate,
       doctorId: data.doctorId,
@@ -73,7 +78,7 @@ export class AppService {
     return this.appointmentRepo.save(newAppointment);
   }
 
-  // 👇 3. NUEVO MÉTODO: Cambiar Estatus (CANCELLED, COMPLETED, etc.)
+  // 👇 3. MÉTODO EDITADO: Disparar evento al completar
   async updateStatus(id: string, status: string): Promise<Appointment> {
     const appointment = await this.appointmentRepo.findOne({ where: { id } });
 
@@ -82,6 +87,24 @@ export class AppService {
     }
 
     appointment.status = status;
-    return this.appointmentRepo.save(appointment);
+    const updatedAppointment = await this.appointmentRepo.save(appointment);
+
+    // 🚀 EVENTO: Si la cita se completó, avisamos a History por RabbitMQ
+    if (status === 'COMPLETED') {
+      console.log(
+        `🚀 [APPOINTMENTS-SVC] Cita ${id} completada. Enviando evento a History...`,
+      );
+
+      this.historyClient.emit('appointment_completed', {
+        appointmentId: updatedAppointment.id,
+        patientId: updatedAppointment.patientId,
+        doctorId: updatedAppointment.doctorId,
+        date: updatedAppointment.date,
+        reason: updatedAppointment.reason,
+        notes: 'Cita finalizada exitosamente',
+      });
+    }
+
+    return updatedAppointment;
   }
 }

@@ -7,10 +7,15 @@ async function bootstrap() {
   const app = await NestFactory.createMicroservice<MicroserviceOptions>(
     AppModule,
     {
-      transport: Transport.RMQ,
+      // Usamos el mismo transporte (Si te da error de tipos usa el número 5)
+      transport: 5,
       options: {
-        urls: ['amqp://guest:guest@localhost:5672'],
-        queue: 'patients_queue',
+        // Asegúrate que la URL sea la misma que en svc-appointments
+        urls: ['amqp://localhost:5672'],
+
+        // 👇 AQUÍ ESTABA EL ERROR: Cambiamos 'patients_queue' por 'history_queue'
+        queue: 'history_queue',
+
         queueOptions: {
           durable: false,
         },
@@ -19,6 +24,8 @@ async function bootstrap() {
   );
 
   await app.listen();
-  Logger.log('🚀 Microservicio de Historias Clínicas escuchando...');
+  Logger.log(
+    '🚀 Microservicio de Historias Clínicas escuchando en history_queue...',
+  );
 }
 bootstrap();
