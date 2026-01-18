@@ -14,7 +14,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { Roles } from './auth/roles.decorator';
 
-@Controller()
+@Controller() // 👈 Agregamos el prefijo 'api' para que tus rutas sean /api/auth, /api/patients, etc.
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
@@ -77,7 +77,7 @@ export class AppController {
     return this.appService.proxyDeletePatient(id, authHeader);
   }
 
-  // 👇 --- RUTAS DE AGENDA / APPOINTMENTS --- 👇
+  // --- RUTAS DE AGENDA / APPOINTMENTS ---
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'doctor', 'receptionist')
@@ -96,29 +96,24 @@ export class AppController {
     return this.appService.proxyGetAppointments(authHeader);
   }
 
-  // 👇 NUEVO: Cancelar o Completar Cita
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'doctor', 'receptionist')
   @Patch('appointments/:id/status')
   async updateAppointmentStatus(
-    @Param('id') id: string, // ID de la URL
-    @Body('status') status: string, // Nuevo estado
+    @Param('id') id: string,
+    @Body('status') status: string,
     @Headers('authorization') authHeader: string,
   ) {
     return this.appService.proxyUpdateAppointmentStatus(id, status, authHeader);
   }
 
-  // --- HISTORIAL ---
+  // --- HISTORIAL CLÍNICO ---
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'doctor')
-  @Get('history')
-  async getHistory() {
-    return this.appService.proxyGetHistory();
-  }
-
-  @Get()
-  getData() {
-    return this.appService.getData();
+  @Get('history') // 👈 Endpoint: GET /api/history
+  async getHistory(@Headers('authorization') authHeader: string) {
+    // Pasamos el authHeader por si acaso necesitas validar algo en el microservicio
+    return this.appService.proxyGetHistory(authHeader);
   }
 }

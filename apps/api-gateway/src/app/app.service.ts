@@ -12,6 +12,7 @@ export class AppService {
 
   constructor(
     private readonly httpService: HttpService,
+    // 👇 Inyectamos el cliente de historia configurado en el AppModule
     @Inject('HISTORY_SERVICE') private readonly clientHistory: ClientProxy,
   ) {}
 
@@ -99,7 +100,6 @@ export class AppService {
 
   // --- 📅 AGENDA / APPOINTMENTS ---
 
-  // Crear Cita
   async proxyCreateAppointment(appointmentDto: any, authHeader: string) {
     try {
       const { data } = await firstValueFrom(
@@ -117,7 +117,6 @@ export class AppService {
     }
   }
 
-  // Ver Citas
   async proxyGetAppointments(authHeader: string) {
     try {
       const { data } = await firstValueFrom(
@@ -131,7 +130,6 @@ export class AppService {
     }
   }
 
-  // 👇 NUEVO: Cambiar Estatus de Cita (CANCELAR / COMPLETAR)
   async proxyUpdateAppointmentStatus(
     id: string,
     status: string,
@@ -141,7 +139,7 @@ export class AppService {
       const { data } = await firstValueFrom(
         this.httpService.patch(
           `${this.APPOINTMENTS_URL}/appointments/${id}/status`,
-          { status }, // Enviamos el estatus en el body
+          { status },
           { headers: { Authorization: authHeader } },
         ),
       );
@@ -151,11 +149,15 @@ export class AppService {
     }
   }
 
-  // --- HISTORIA (RABBITMQ) ---
-  async proxyGetHistory() {
+  // --- 🏥 HISTORIA (RABBITMQ) ---
+
+  // 👇 EDITADO: Ahora acepta authHeader para que coincida con el controlador
+  async proxyGetHistory(authHeader: string) {
     try {
+      console.log('🛰️ Gateway: Pidiendo historias a RabbitMQ...');
+      // Enviamos la petición y el authHeader (aunque Rabbit no lo use estrictamente ahora)
       return await firstValueFrom(
-        this.clientHistory.send({ cmd: 'get_all_histories' }, {}),
+        this.clientHistory.send({ cmd: 'get_all_histories' }, { authHeader }),
       );
     } catch (error) {
       throw new HttpException(
@@ -169,7 +171,6 @@ export class AppService {
     return { message: 'Bienvenido al API Gateway de la Clínica Odontológica' };
   }
 
-  // --- HELPER PARA MANEJAR ERRORES HTTP (DRY) ---
   private handleError(error: any) {
     const msg =
       error.response?.data || 'Error de comunicación con microservicio';
