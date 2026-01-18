@@ -5,15 +5,19 @@ import {
   Body,
   UseGuards,
   Headers,
-  Patch, // 👈 Necesario para editar
-  Delete, // 👈 Necesario para borrar
-  Param, // 👈 Necesario para leer el :id de la URL
+  Patch,
+  Delete,
+  Param,
 } from '@nestjs/common';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { Roles } from './auth/roles.decorator';
 
+@Controller() // ⚠️ Nota: Asegúrate de que el decorador sea @Controller() o @Controller('api') según tu preferencia, pero mantén consistencia.
+// Si en main.ts pusiste app.setGlobalPrefix('api'), aquí déjalo como @Controller().
+// Si NO pusiste prefijo global, usa @Controller('api').
+// Asumiré que en main.ts tienes el prefijo global, así que dejo @Controller().
 @Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
@@ -37,6 +41,8 @@ export class AppController {
     return this.appService.proxyAuthRegister(userDto, authHeader);
   }
 
+  // --- PACIENTES ---
+
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'doctor', 'receptionist')
   @Get('patients')
@@ -54,21 +60,19 @@ export class AppController {
     return this.appService.proxyCreatePatient(patientDto, authHeader);
   }
 
-  // 👇 NUEVO: Editar Paciente (PATCH /patients/:id)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin', 'doctor') // Doctores y Admin pueden corregir datos
+  @Roles('admin', 'doctor')
   @Patch('patients/:id')
   async updatePatient(
-    @Param('id') id: string, // Leemos el ID de la URL
-    @Body() updateDto: any, // Leemos los datos a cambiar
+    @Param('id') id: string,
+    @Body() updateDto: any,
     @Headers('authorization') authHeader: string,
   ) {
     return this.appService.proxyUpdatePatient(id, updateDto, authHeader);
   }
 
-  // 👇 NUEVO: Borrar Paciente (DELETE /patients/:id)
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('admin') // ⚠️ Solo el ADMIN puede borrar (seguridad extra)
+  @Roles('admin')
   @Delete('patients/:id')
   async deletePatient(
     @Param('id') id: string,
@@ -76,6 +80,27 @@ export class AppController {
   ) {
     return this.appService.proxyDeletePatient(id, authHeader);
   }
+
+  // 👇 --- RUTAS DE AGENDA / APPOINTMENTS (NUEVO) --- 👇
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'doctor', 'receptionist') // ¡Recepcionistas pueden agendar!
+  @Post('appointments')
+  async createAppointment(
+    @Body() appointmentDto: any,
+    @Headers('authorization') authHeader: string,
+  ) {
+    return this.appService.proxyCreateAppointment(appointmentDto, authHeader);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'doctor', 'receptionist')
+  @Get('appointments')
+  async getAppointments(@Headers('authorization') authHeader: string) {
+    return this.appService.proxyGetAppointments(authHeader);
+  }
+
+  // --- HISTORIAL ---
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'doctor')

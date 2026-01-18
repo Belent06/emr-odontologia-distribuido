@@ -1,7 +1,5 @@
-version: '3.8'
-
 services:
-  # 1. Base de Datos Principal (Ya la tenías)
+  # 1. Base de Datos para AUTH (Usuarios) - PUERTO 5435
   emr-postgres:
     image: postgres:15
     container_name: emr-postgres
@@ -14,28 +12,34 @@ services:
       - '5435:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    networks:
+      - emr-network
 
-  # 2. Redis - El sistema de Cache (NUEVO)
+  # 2. Redis - Cache
   emr-redis:
     image: redis:7-alpine
     container_name: emr-redis
     restart: always
     ports:
       - '6379:6379'
+    networks:
+      - emr-network
 
-  # 3. RabbitMQ - El Message Broker (NUEVO)
+  # 3. RabbitMQ - Mensajería
   emr-rabbitmq:
     image: rabbitmq:3-management
     container_name: emr-rabbitmq
     restart: always
     ports:
-      - '5672:5672' # Puerto de comunicación de datos
-      - '15672:15672' # Puerto del Panel de Control (Dashboard)
+      - '5672:5672'
+      - '15672:15672'
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - emr-network
 
-  # 4. MongoDB - Base de datos para Historias Clínicas (NUEVO)
+  # 4. MongoDB - PACIENTES e HISTORIA - PUERTO 27017
   emr-mongodb:
     image: mongo:latest
     container_name: emr-mongodb
@@ -47,7 +51,30 @@ services:
       MONGO_INITDB_ROOT_PASSWORD: adminpassword
     volumes:
       - mongo_data:/data/db
+    networks:
+      - emr-network
+
+  # 👇 5. Base de Datos para AGENDA (NUEVO) - PUERTO 5436
+  emr-postgres-appointments:
+    image: postgres:15
+    container_name: emr-postgres-appointments
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: appointments_db # 👈 Base de datos específica para citas
+    ports:
+      - '5436:5432' # 👈 Mapeamos al puerto 5436 del host
+    volumes:
+      - postgres_appointments_data:/var/lib/postgresql/data # 👈 Volumen separado
+    networks:
+      - emr-network
 
 volumes:
   postgres_data:
+  postgres_appointments_data: # 👈 Nuevo volumen persistente
   mongo_data:
+
+networks:
+  emr-network:
+    driver: bridge
