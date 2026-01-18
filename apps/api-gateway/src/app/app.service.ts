@@ -8,13 +8,14 @@ export class AppService {
   // Asegúrate de que estos puertos sean los CORRECTOS de tus microservicios
   private readonly AUTH_URL = 'http://localhost:3000/api'; // svc-auth
   private readonly PATIENTS_URL = 'http://localhost:3333/api'; // svc-patients
+  private readonly APPOINTMENTS_URL = 'http://localhost:3001/api'; // svc-appointments
 
   constructor(
     private readonly httpService: HttpService,
     @Inject('HISTORY_SERVICE') private readonly clientHistory: ClientProxy,
   ) {}
 
-  // 1. Proxy para Login
+  // --- AUTH ---
   async proxyAuthLogin(loginDto: any) {
     try {
       const { data } = await firstValueFrom(
@@ -26,7 +27,6 @@ export class AppService {
     }
   }
 
-  // 2. Proxy para Registro
   async proxyAuthRegister(userDto: any, authHeader: string) {
     try {
       const { data } = await firstValueFrom(
@@ -40,7 +40,7 @@ export class AppService {
     }
   }
 
-  // 3. Proxy para Obtener Pacientes
+  // --- PACIENTES ---
   async proxyGetPatients(authHeader: string) {
     try {
       const { data } = await firstValueFrom(
@@ -54,7 +54,6 @@ export class AppService {
     }
   }
 
-  // 4. Proxy para Crear Pacientes
   async proxyCreatePatient(patientDto: any, authHeader: string) {
     try {
       const { data } = await firstValueFrom(
@@ -68,11 +67,9 @@ export class AppService {
     }
   }
 
-  // 6. Proxy para Editar Paciente (PATCH) - 🆕 NUEVO
   async proxyUpdatePatient(id: string, updateDto: any, authHeader: string) {
     try {
       const { data } = await firstValueFrom(
-        // Axios Patch: URL, Body, Config
         this.httpService.patch(
           `${this.PATIENTS_URL}/patients/${id}`,
           updateDto,
@@ -87,11 +84,9 @@ export class AppService {
     }
   }
 
-  // 7. Proxy para Borrar Paciente (DELETE) - 🆕 NUEVO
   async proxyDeletePatient(id: string, authHeader: string) {
     try {
       const { data } = await firstValueFrom(
-        // Axios Delete: URL, Config (NO lleva body)
         this.httpService.delete(`${this.PATIENTS_URL}/patients/${id}`, {
           headers: { Authorization: authHeader },
         }),
@@ -102,7 +97,61 @@ export class AppService {
     }
   }
 
-  // 5. Proxy para Historia Clínica (RABBITMQ)
+  // --- 📅 AGENDA / APPOINTMENTS ---
+
+  // Crear Cita
+  async proxyCreateAppointment(appointmentDto: any, authHeader: string) {
+    try {
+      const { data } = await firstValueFrom(
+        this.httpService.post(
+          `${this.APPOINTMENTS_URL}/appointments`,
+          appointmentDto,
+          {
+            headers: { Authorization: authHeader },
+          },
+        ),
+      );
+      return data;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // Ver Citas
+  async proxyGetAppointments(authHeader: string) {
+    try {
+      const { data } = await firstValueFrom(
+        this.httpService.get(`${this.APPOINTMENTS_URL}/appointments`, {
+          headers: { Authorization: authHeader },
+        }),
+      );
+      return data;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // 👇 NUEVO: Cambiar Estatus de Cita (CANCELAR / COMPLETAR)
+  async proxyUpdateAppointmentStatus(
+    id: string,
+    status: string,
+    authHeader: string,
+  ) {
+    try {
+      const { data } = await firstValueFrom(
+        this.httpService.patch(
+          `${this.APPOINTMENTS_URL}/appointments/${id}/status`,
+          { status }, // Enviamos el estatus en el body
+          { headers: { Authorization: authHeader } },
+        ),
+      );
+      return data;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // --- HISTORIA (RABBITMQ) ---
   async proxyGetHistory() {
     try {
       return await firstValueFrom(
