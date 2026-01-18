@@ -1,4 +1,4 @@
-import { Inject, Injectable, HttpException } from '@nestjs/common'; // 👈 Importante: HttpException
+import { Inject, Injectable, HttpException } from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { ClientProxy } from '@nestjs/microservices';
 import { firstValueFrom } from 'rxjs';
@@ -68,17 +68,47 @@ export class AppService {
     }
   }
 
+  // 6. Proxy para Editar Paciente (PATCH) - 🆕 NUEVO
+  async proxyUpdatePatient(id: string, updateDto: any, authHeader: string) {
+    try {
+      const { data } = await firstValueFrom(
+        // Axios Patch: URL, Body, Config
+        this.httpService.patch(
+          `${this.PATIENTS_URL}/patients/${id}`,
+          updateDto,
+          {
+            headers: { Authorization: authHeader },
+          },
+        ),
+      );
+      return data;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // 7. Proxy para Borrar Paciente (DELETE) - 🆕 NUEVO
+  async proxyDeletePatient(id: string, authHeader: string) {
+    try {
+      const { data } = await firstValueFrom(
+        // Axios Delete: URL, Config (NO lleva body)
+        this.httpService.delete(`${this.PATIENTS_URL}/patients/${id}`, {
+          headers: { Authorization: authHeader },
+        }),
+      );
+      return data;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
   // 5. Proxy para Historia Clínica (RABBITMQ)
   async proxyGetHistory() {
-    // RabbitMQ maneja los errores de forma diferente (Observable),
-    // pero firstValueFrom lanzará error si falla.
     try {
       return await firstValueFrom(
         this.clientHistory.send({ cmd: 'get_all_histories' }, {}),
       );
     } catch (error) {
-      // RabbitMQ suele devolver objetos de error, no response HTTP estándar
-      // Devolvemos un 500 genérico o el mensaje si existe
       throw new HttpException(
         error.message || 'Error en microservicio de historia',
         500,
@@ -92,12 +122,9 @@ export class AppService {
 
   // --- HELPER PARA MANEJAR ERRORES HTTP (DRY) ---
   private handleError(error: any) {
-    // Extraemos el mensaje y el status que nos devolvió el microservicio
     const msg =
       error.response?.data || 'Error de comunicación con microservicio';
     const status = error.response?.status || 500;
-
-    // Lanzamos la excepción para que NestJS responda bonito al cliente
     throw new HttpException(msg, status);
   }
 }

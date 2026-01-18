@@ -1,4 +1,3 @@
-// 👇 1. IMPORTANTE: Agregamos 'Headers' a los imports
 import {
   Controller,
   Get,
@@ -6,6 +5,9 @@ import {
   Body,
   UseGuards,
   Headers,
+  Patch, // 👈 Necesario para editar
+  Delete, // 👈 Necesario para borrar
+  Param, // 👈 Necesario para leer el :id de la URL
 } from '@nestjs/common';
 import { AppService } from './app.service';
 import { JwtAuthGuard } from './auth/jwt-auth.guard';
@@ -20,7 +22,6 @@ export class AppController {
 
   @Post('auth/login')
   async login(@Body() loginDto: any) {
-    // Login es público, no necesita headers ni token previo
     return this.appService.proxyAuthLogin(loginDto);
   }
 
@@ -31,18 +32,15 @@ export class AppController {
   @Roles('admin')
   async register(
     @Body() userDto: any,
-    @Headers('authorization') authHeader: string, // 👈 2. Capturamos el token del Admin
+    @Headers('authorization') authHeader: string,
   ) {
-    // Se lo pasamos al servicio para que svc-auth sepa que quien lo pide es un Admin
     return this.appService.proxyAuthRegister(userDto, authHeader);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'doctor', 'receptionist')
   @Get('patients')
-  async getPatients(
-    @Headers('authorization') authHeader: string, // 👈 3. Capturamos el token
-  ) {
+  async getPatients(@Headers('authorization') authHeader: string) {
     return this.appService.proxyGetPatients(authHeader);
   }
 
@@ -51,17 +49,38 @@ export class AppController {
   @Post('patients')
   async createPatient(
     @Body() patientDto: any,
-    @Headers('authorization') authHeader: string, // 👈 4. Capturamos el token
+    @Headers('authorization') authHeader: string,
   ) {
     return this.appService.proxyCreatePatient(patientDto, authHeader);
+  }
+
+  // 👇 NUEVO: Editar Paciente (PATCH /patients/:id)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'doctor') // Doctores y Admin pueden corregir datos
+  @Patch('patients/:id')
+  async updatePatient(
+    @Param('id') id: string, // Leemos el ID de la URL
+    @Body() updateDto: any, // Leemos los datos a cambiar
+    @Headers('authorization') authHeader: string,
+  ) {
+    return this.appService.proxyUpdatePatient(id, updateDto, authHeader);
+  }
+
+  // 👇 NUEVO: Borrar Paciente (DELETE /patients/:id)
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin') // ⚠️ Solo el ADMIN puede borrar (seguridad extra)
+  @Delete('patients/:id')
+  async deletePatient(
+    @Param('id') id: string,
+    @Headers('authorization') authHeader: string,
+  ) {
+    return this.appService.proxyDeletePatient(id, authHeader);
   }
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'doctor')
   @Get('history')
   async getHistory() {
-    // RabbitMQ NO usa headers HTTP, así que este se queda igual.
-    // El Gateway ya validó la seguridad aquí.
     return this.appService.proxyGetHistory();
   }
 
