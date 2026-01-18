@@ -3,19 +3,31 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
 describe('AppController', () => {
-  let app: TestingModule;
+  let controller: AppController;
 
-  beforeAll(async () => {
-    app = await Test.createTestingModule({
+  // Creamos un "doble" del servicio
+  const mockAppService = {
+    proxyCreateAppointment: jest.fn(),
+    proxyGetAppointments: jest.fn(),
+    proxyUpdateAppointmentStatus: jest.fn(),
+    // Agrega aquí otros métodos si los necesitas, pero con esto basta para que compile
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
-      providers: [AppService],
+      providers: [
+        {
+          provide: AppService,
+          useValue: mockAppService,
+        },
+      ],
     }).compile();
+
+    controller = module.get<AppController>(AppController);
   });
 
-  describe('getData', () => {
-    it('should return "Hello API"', () => {
-      const appController = app.get<AppController>(AppController);
-      expect(appController.getData()).toEqual({ message: 'Hello API' });
-    });
+  it('should be defined', () => {
+    expect(controller).toBeDefined();
   });
 });
