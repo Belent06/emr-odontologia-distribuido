@@ -152,16 +152,22 @@ export class AppService {
   // --- 🏥 HISTORIA (RABBITMQ) ---
 
   // 👇 EDITADO: Ahora acepta authHeader para que coincida con el controlador
-  async proxyGetHistory(authHeader: string) {
+  async proxyGetHistory(patientId: string, authHeader: string) {
     try {
-      console.log('🛰️ Gateway: Pidiendo historias a RabbitMQ...');
-      // Enviamos la petición y el authHeader (aunque Rabbit no lo use estrictamente ahora)
+      console.log(
+        `🛰️ Gateway: Pidiendo historial específico para paciente: ${patientId}`,
+      );
+
       return await firstValueFrom(
-        this.clientHistory.send({ cmd: 'get_all_histories' }, { authHeader }),
+        this.clientHistory.send(
+          { cmd: 'get_histories_by_patient' }, // 👈 1. Usamos el comando de búsqueda por ID
+          patientId, // 👈 2. Payload: Enviamos el ID (string) directamente
+        ),
       );
     } catch (error) {
+      console.error('❌ Error en Gateway-History:', error);
       throw new HttpException(
-        error.message || 'Error en microservicio de historia',
+        error.message || 'Error comunicando con microservicio de historia',
         500,
       );
     }

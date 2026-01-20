@@ -111,9 +111,12 @@ export class AppController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'doctor')
-  @Get('history') // 👈 Endpoint: GET /api/history
-  async getHistory(@Headers('authorization') authHeader: string) {
-    // Pasamos el authHeader por si acaso necesitas validar algo en el microservicio
-    return this.appService.proxyGetHistory(authHeader);
+  @Get('history/:patientId') // ✅ Define la ruta
+  async getHistory(
+    @Param('patientId') patientId: string, // 👈 ¡ESTO FALTABA! Captura el ID
+    @Headers('authorization') authHeader: string,
+  ) {
+    // Ahora pasamos AMBOS: el ID para buscar y el Header por si acaso
+    return this.appService.proxyGetHistory(patientId, authHeader);
   }
 }

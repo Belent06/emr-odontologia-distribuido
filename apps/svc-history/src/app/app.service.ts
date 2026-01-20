@@ -1,104 +1,106 @@
-import {
-  Injectable,
-  Logger,
-  InternalServerErrorException,
-} from '@nestjs/common';
-import { InjectModel } from '@nestjs/mongoose';
-import { Model } from 'mongoose';
-import { PatientHistory } from './schemas/patient-history.schema';
+import { Injectable, Logger } from '@nestjs/common';
+// 👇 Usamos el SDK de AWS en lugar de Mongoose
+import { DynamoDB } from 'aws-sdk';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class AppService {
   private readonly logger = new Logger('AppService');
 
-  constructor(
-    @InjectModel(PatientHistory.name)
-    private historyModel: Model<PatientHistory>,
-  ) {}
+  // 👇 CLIENTE DYNAMODB COMPATIBLE CON LOCAL Y NUBE
+  private readonly dynamoDb = new DynamoDB.DocumentClient({
+    region: 'us-east-1',
+    endpoint: process.env.DYNAMODB_ENDPOINT || 'http://localhost:8000',
+    credentials: {
+      accessKeyId: 'fake', // Dynamo Local acepta esto
+      secretAccessKey: 'fake',
+    },
+  });
 
-  async createInitialHistory(patientData: any) {
+  private readonly tableName = 'emr-history-table'; // ⚠️ Debes crearla con el script init-dynamo.js
+
+  // 1. GUARDAR ENTRADA (Command) - Viene de RabbitMQ
+  async addEntryFromAppointment(data: any) {
+    this.logger.log(
+      `📩 [DynamoDB] Persistiendo historial para: ${data.patientId}`,
+    );
+
+    const timestamp = new Date().toISOString();
+
+    // PATRÓN SINGLE-TABLE DESIGN
+    const item = {
+      PK: `PACIENTE#${data.patientId}`, // Partition Key
+      SK: `HISTORIAL#${timestamp}`, // Sort Key
+      Type: 'MEDICAL_NOTE',
+      AppointmentId: data.appointmentId || uuidv4(),
+      DoctorId: data.doctorId,
+      Reason: data.reason,
+      Details: data.notes || 'Sin notas',
+      CreatedAt: timestamp,
+      PatientName: 'Paciente Referenciado', // Dato desnormalizado
+    };
+
     try {
-      const newHistory = new this.historyModel({
-        patientId: patientData.id,
-        patientName: patientData.firstName || patientData.name,
-        medicalNotes: [
-          {
-            date: new Date(),
-            content: 'Expediente creado automáticamente por el sistema.',
-            doctorId: 'SYSTEM',
-          },
-        ],
-      });
+      await this.dynamoDb
+        .put({
+          TableName: this.tableName,
+          Item: item,
+        })
+        .promise();
 
-      const saved = await newHistory.save();
-      this.logger.log(
-        `💾 Historia guardada en MongoDB para: ${saved.patientName}`,
-      );
-      return saved;
+      this.logger.log('✅ Item guardado en DynamoDB correctamente');
+      return item;
     } catch (error) {
-      this.logger.error(`❌ Error al crear historia inicial: ${error.message}`);
+      this.logger.error(`❌ Error DynamoDB Put: ${error.message}`);
       throw error;
     }
   }
 
-  async findAll() {
-    this.logger.log('🔍 [AppService] Iniciando búsqueda en MongoDB...');
+  // 2. BUSCAR POR PACIENTE (Query) - Optimizado
+  // Este método reemplaza a la búsqueda general
+  async findAllByPatient(patientId: string) {
+    this.logger.log(`🔍 [DynamoDB] Buscando historial de: ${patientId}`);
+
+    const params = {
+      TableName: this.tableName,
+      KeyConditionExpression: 'PK = :pk',
+      ExpressionAttributeValues: {
+        ':pk': `PACIENTE#${patientId}`,
+      },
+      ScanIndexForward: false, // false = Trae del más nuevo al más antiguo
+    };
+
     try {
-      const histories = await this.historyModel.find().lean().exec();
-
-      // 💡 TRUCO: Convertimos a string y luego a JSON para eliminar cualquier
-      // rastro de tipos complejos de Mongoose que puedan trabar a RabbitMQ.
-      const cleanData = JSON.parse(JSON.stringify(histories));
-
-      this.logger.log(
-        `✅ [AppService] Búsqueda finalizada. Documentos encontrados: ${cleanData.length}`,
-      );
-      return cleanData;
+      const result = await this.dynamoDb.query(params).promise();
+      return result.Items;
     } catch (error) {
-      this.logger.error(
-        `❌ [AppService] Error crítico en MongoDB: ${error.message}`,
-      );
+      this.logger.error(`❌ Error DynamoDB Query: ${error.message}`);
       return [];
     }
   }
 
-  async addEntryFromAppointment(data: any) {
+  // ⚠️ MÉTODO LEGACY: findAll() (Escaneo total)
+  // Lo mantenemos TEMPORALMENTE para que tu API Gateway no falle si llama a "traer todo",
+  // pero esto es ineficiente en producción.
+  async findAll() {
+    this.logger.warn(
+      '⚠️ [DynamoDB] SCAN ejecutado. Esto es costoso en producción.',
+    );
     try {
-      this.logger.log(
-        `📩 Recibiendo datos de cita para paciente: ${data.patientId}`,
-      );
-
-      let history = await this.historyModel.findOne({
-        patientId: data.patientId,
-      });
-
-      if (!history) {
-        this.logger.warn(
-          `⚠️ No existía historial para ${data.patientId}. Creando uno nuevo...`,
-        );
-        history = new this.historyModel({
-          patientId: data.patientId,
-          patientName: 'Paciente (Generado por Cita)',
-          medicalNotes: [],
-        });
-      }
-
-      const newNote = {
-        date: new Date(),
-        content: `Cita Finalizada. Motivo: ${data.reason}. Detalles: ${data.notes || 'Sin notas adicionales'}`,
-        doctorId: data.doctorId,
-      };
-
-      history.medicalNotes.push(newNote as any);
-      const saved = await history.save();
-
-      this.logger.log(
-        `✅ Entrada médica agregada exitosamente para el paciente ${data.patientId}`,
-      );
-      return saved;
+      const result = await this.dynamoDb
+        .scan({ TableName: this.tableName })
+        .promise();
+      return result.Items;
     } catch (error) {
-      this.logger.error(`❌ Error al agregar entrada médica: ${error.message}`);
-      throw error;
+      return [];
     }
+  }
+
+  // Método legacy de inicialización (ya no es necesario en Dynamo, dejamos log)
+  async createInitialHistory(patientData: any) {
+    this.logger.log(
+      `ℹ️ [DynamoDB] Schemaless: No se requiere inicializar colección para ${patientData.id}`,
+    );
+    return { status: 'skipped' };
   }
 }
