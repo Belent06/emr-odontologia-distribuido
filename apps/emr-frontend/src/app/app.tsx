@@ -4,43 +4,41 @@ import {
   Link,
   useLocation,
   useNavigate,
-} from 'react-router-dom'; // 👈 Importamos useLocation y useNavigate
+} from 'react-router-dom';
 import Login from '../pages/login';
 import PatientsList from '../pages/patients-list';
 import { AppointmentsPage } from '../pages/appointments';
+// 👇 1. IMPORTAMOS LA NUEVA PÁGINA DE HISTORIAL
+import { HistoryPage } from '../pages/HistoryPage';
 
 export function App() {
-  const location = useLocation(); // Hook para saber en qué URL estamos
-  const navigate = useNavigate(); // Hook para redireccionar
+  const location = useLocation();
+  const navigate = useNavigate();
 
   // Definimos que si la ruta es "/", entonces estamos en el Login
   const isLoginPage = location.pathname === '/';
 
-  // Función para cerrar sesión
   const handleLogout = () => {
-    localStorage.removeItem('jwt'); // Borramos el token (usando 'jwt' como definimos antes)
-    navigate('/'); // Nos manda al login
+    localStorage.removeItem('jwt');
+    navigate('/');
   };
 
   return (
     <div>
       {/* --- 🧭 BARRA DE NAVEGACIÓN --- */}
-      {/* La condición !isLoginPage significa: "Si NO estamos en el login, muestra el menú" */}
       {!isLoginPage && (
         <nav
           style={{
             padding: '15px',
             borderBottom: '1px solid #ccc',
             background: '#f8f9fa',
-            display: 'flex', // 👈 Agregado para alinear mejor
-            justifyContent: 'space-between', // Separa menú a la izq y botón a la der
+            display: 'flex',
+            justifyContent: 'space-between',
             alignItems: 'center',
           }}
         >
           {/* Lado Izquierdo: Links de navegación */}
           <div>
-            {/* ❌ Quitamos el Link de Login, ya no es necesario aquí */}
-
             <Link
               to="/patients"
               style={{
@@ -82,15 +80,20 @@ export function App() {
         </nav>
       )}
 
+      {/* --- 🛣️ RUTAS DE LA APLICACIÓN --- */}
       <Routes>
         {/* Ruta raíz: Login */}
         <Route path="/" element={<Login />} />
 
-        {/* Ruta /patients: Lista de Pacientes (MongoDB) */}
+        {/* Ruta /patients: Lista de Pacientes (PostgreSQL) */}
         <Route path="/patients" element={<PatientsList />} />
 
         {/* Ruta /appointments: Agenda (PostgreSQL) */}
         <Route path="/appointments" element={<AppointmentsPage />} />
+
+        {/* 👇 2. NUEVA RUTA DINÁMICA: Historial (DynamoDB) */}
+        {/* :id captura el número de cédula que pasemos en la URL */}
+        <Route path="/patients/:id/history" element={<HistoryPage />} />
       </Routes>
     </div>
   );

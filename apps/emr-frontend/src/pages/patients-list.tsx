@@ -25,6 +25,7 @@ import {
   Toolbar,
   AppBar,
   Box,
+  Tooltip, // 👈 Agregado para mostrar texto al pasar el mouse
 } from '@mui/material';
 
 // --- ICONOS ---
@@ -32,6 +33,7 @@ import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import LogoutIcon from '@mui/icons-material/Logout';
+import HistoryIcon from '@mui/icons-material/History'; // 👈 1. IMPORTAMOS EL ICONO DE HISTORIAL
 
 export function PatientsList() {
   const [patients, setPatients] = useState<IPatient[]>([]);
@@ -122,7 +124,6 @@ export function PatientsList() {
           authConfig,
         );
       } else {
-        // CORRECCIÓN AQUÍ: Comillas simples en ambos lados
         await axios.post(
           'http://localhost:3080/api/patients',
           formData,
@@ -237,18 +238,35 @@ export function PatientsList() {
                   <TableCell>{patient.phone}</TableCell>
                   <TableCell align="center">
                     <Stack direction="row" spacing={1} justifyContent="center">
-                      <IconButton
-                        color="primary"
-                        onClick={() => handleEditClick(patient)}
-                      >
-                        <EditIcon />
-                      </IconButton>
-                      <IconButton
-                        color="error"
-                        onClick={() => handleDelete(patient.id)}
-                      >
-                        <DeleteIcon />
-                      </IconButton>
+                      {/* 👇 2. BOTÓN DE HISTORIAL (NUEVO) */}
+                      <Tooltip title="Ver Historial Clínico">
+                        <IconButton
+                          color="secondary" // Color diferente para destacar
+                          onClick={() =>
+                            navigate(`/patients/${patient.id}/history`)
+                          }
+                        >
+                          <HistoryIcon />
+                        </IconButton>
+                      </Tooltip>
+
+                      <Tooltip title="Editar">
+                        <IconButton
+                          color="primary"
+                          onClick={() => handleEditClick(patient)}
+                        >
+                          <EditIcon />
+                        </IconButton>
+                      </Tooltip>
+
+                      <Tooltip title="Eliminar">
+                        <IconButton
+                          color="error"
+                          onClick={() => handleDelete(patient.id)}
+                        >
+                          <DeleteIcon />
+                        </IconButton>
+                      </Tooltip>
                     </Stack>
                   </TableCell>
                 </TableRow>
