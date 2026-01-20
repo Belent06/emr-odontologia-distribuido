@@ -3,25 +3,32 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 
 describe('AppController', () => {
-  let appController: AppController;
+  let app: TestingModule;
 
-  beforeEach(async () => {
-    const app: TestingModule = await Test.createTestingModule({
+  // 👇 MOCK DEL SERVICIO
+  const mockAppService = {
+    addEntryFromAppointment: jest.fn(),
+    findAllByPatient: jest.fn(),
+    createInitialHistory: jest.fn(),
+    findAll: jest.fn(),
+  };
+
+  beforeAll(async () => {
+    app = await Test.createTestingModule({
       controllers: [AppController],
       providers: [
         {
           provide: AppService,
-          useValue: {
-            createInitialHistory: jest.fn().mockResolvedValue({}), // Mock de tu nueva función
-          },
+          useValue: mockAppService, // 👈 Inyección del mock
         },
       ],
     }).compile();
-
-    appController = app.get<AppController>(AppController);
   });
 
-  it('should be defined', () => {
-    expect(appController).toBeDefined();
+  describe('root', () => {
+    it('should be defined', () => {
+      const appController = app.get<AppController>(AppController);
+      expect(appController).toBeDefined();
+    });
   });
 });

@@ -6,25 +6,36 @@ import { Appointment } from './appointment.entity';
 describe('AppService', () => {
   let service: AppService;
 
-  // Creamos un "doble" del repositorio con funciones vacías
-  const mockAppointmentRepository = {
-    find: jest.fn(() => []),
-    findOne: jest.fn(),
+  // 1. Mock del Repositorio de TypeORM (Base de Datos Falsa)
+  const mockRepository = {
     create: jest.fn(),
     save: jest.fn(),
+    find: jest.fn(),
+    findOne: jest.fn(),
     update: jest.fn(),
     delete: jest.fn(),
+  };
+
+  // 2. Mock de RabbitMQ (Servicio de Mensajería Falso)
+  const mockHistoryClient = {
+    emit: jest.fn(),
+    send: jest.fn(),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AppService,
+        // 👇 Inyectamos el Mock del Repositorio de Citas
         {
-          // Cuando el servicio pida el Repositorio de Appointment...
           provide: getRepositoryToken(Appointment),
-          // ...le damos este objeto falso.
-          useValue: mockAppointmentRepository,
+          useValue: mockRepository,
+        },
+        // 👇 Inyectamos el Mock de RabbitMQ ('HISTORY_SERVICE')
+        // El error decía explícitamente que faltaba este proveedor
+        {
+          provide: 'HISTORY_SERVICE',
+          useValue: mockHistoryClient,
         },
       ],
     }).compile();
