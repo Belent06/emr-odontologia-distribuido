@@ -7,32 +7,47 @@ import { CACHE_MANAGER } from '@nestjs/cache-manager';
 describe('PatientsService', () => {
   let service: PatientsService;
 
+  // 1. Mock del Repositorio de TypeORM
+  const mockRepository = {
+    find: jest.fn(),
+    findOne: jest.fn(),
+    save: jest.fn(),
+    create: jest.fn(),
+    update: jest.fn(),
+    delete: jest.fn(),
+  };
+
+  // 2. Mock del Cliente RabbitMQ ('HISTORY_SERVICE')
+  const mockHistoryClient = {
+    emit: jest.fn(), // Para eventos (EventPattern)
+    send: jest.fn(), // Para mensajes (MessagePattern)
+  };
+
+  // 3. Mock del Cache Manager (Redis)
+  const mockCacheManager = {
+    get: jest.fn(),
+    set: jest.fn(),
+    del: jest.fn(),
+  };
+
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         PatientsService,
+        // 👇 Inyectamos el Mock del Repositorio
         {
           provide: getRepositoryToken(Patient),
-          useValue: {
-            find: jest.fn(),
-            findOneBy: jest.fn(),
-            create: jest.fn(),
-            save: jest.fn(),
-          },
+          useValue: mockRepository,
         },
+        // 👇 Inyectamos el Mock de RabbitMQ (¡ESTO FALTABA!)
         {
-          provide: 'PATIENT_SERVICE', // RabbitMQ Client
-          useValue: {
-            emit: jest.fn(),
-          },
+          provide: 'HISTORY_SERVICE',
+          useValue: mockHistoryClient,
         },
+        // 👇 Inyectamos el Mock de Cache
         {
-          provide: CACHE_MANAGER, // Redis Cache
-          useValue: {
-            get: jest.fn(),
-            set: jest.fn(),
-            del: jest.fn(),
-          },
+          provide: CACHE_MANAGER,
+          useValue: mockCacheManager,
         },
       ],
     }).compile();

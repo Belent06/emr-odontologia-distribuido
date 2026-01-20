@@ -5,12 +5,13 @@ import { AppService } from './app.service';
 describe('AppController', () => {
   let controller: AppController;
 
-  // Creamos un "doble" del servicio
+  // 👇 1. Mock corregido con nombres de métodos de Microservicio (no del Gateway)
   const mockAppService = {
-    proxyCreateAppointment: jest.fn(),
-    proxyGetAppointments: jest.fn(),
-    proxyUpdateAppointmentStatus: jest.fn(),
-    // Agrega aquí otros métodos si los necesitas, pero con esto basta para que compile
+    create: jest.fn(), // Antes era proxyCreateAppointment
+    findAll: jest.fn(), // Antes era proxyGetAppointments
+    updateStatus: jest.fn(), // Antes era proxyUpdateAppointmentStatus
+    cancel: jest.fn(),
+    getData: jest.fn(),
   };
 
   beforeEach(async () => {

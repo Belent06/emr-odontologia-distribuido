@@ -2,7 +2,7 @@ import { HttpModule } from '@nestjs/axios';
 import { Module } from '@nestjs/common';
 import { PassportModule } from '@nestjs/passport';
 import { JwtModule } from '@nestjs/jwt';
-import { ClientsModule, Transport } from '@nestjs/microservices'; // 👈 Importar estos
+import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { JwtStrategy } from './auth/jwt.strategy';
@@ -16,18 +16,31 @@ import { JwtStrategy } from './auth/jwt.strategy';
       signOptions: { expiresIn: '24h' },
     }),
 
-    // 👇 REGISTRAMOS EL CLIENTE DE RABBITMQ PARA HISTORIAS 👇
+    // 👇 CONFIGURACIÓN CORREGIDA PARA HISTORIAS 👇
     ClientsModule.register([
       {
-        name: 'HISTORY_SERVICE', // Nombre para inyectar en el servicio
-        transport: Transport.RMQ,
+        name: 'HISTORY_SERVICE',
+        // 1. Usamos el número 5 si 'Transport.RABBITMQ' te da error de tipos
+        transport: 5,
         options: {
-          urls: ['amqp://guest:guest@localhost:5672'],
-          queue: 'patients_queue', // ⚠️ Debe ser igual al de svc-history
+          urls: ['amqp://localhost:5672'],
+          // 2. ⚠️ CAMBIO CRÍTICO: Debe ser 'history_queue' para coincidir con svc-history
+          queue: 'history_queue',
           queueOptions: {
             durable: false,
           },
         },
+      },
+      // Si tienes otros microservicios por TCP, agrégalos aquí...
+      {
+        name: 'PATIENTS_SERVICE',
+        transport: Transport.TCP,
+        options: { host: 'localhost', port: 3002 },
+      },
+      {
+        name: 'APPOINTMENTS_SERVICE',
+        transport: Transport.TCP,
+        options: { host: 'localhost', port: 3003 },
       },
     ]),
   ],
