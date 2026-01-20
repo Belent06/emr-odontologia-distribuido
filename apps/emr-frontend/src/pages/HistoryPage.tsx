@@ -8,7 +8,7 @@ export const HistoryPage: React.FC = () => {
   const navigate = useNavigate();
 
   // 2. Recuperamos el token (idealmente de un Context, aquí del storage por rapidez)
-  const token = localStorage.getItem('access_token') || '';
+  const token = localStorage.getItem('jwt') || '';
 
   if (!id) return <div>Error: No se especificó paciente.</div>;
 
