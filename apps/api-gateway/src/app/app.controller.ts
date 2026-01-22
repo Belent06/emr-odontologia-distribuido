@@ -14,7 +14,7 @@ import { JwtAuthGuard } from './auth/jwt-auth.guard';
 import { RolesGuard } from './auth/roles.guard';
 import { Roles } from './auth/roles.decorator';
 
-@Controller() // 👈 Agregamos el prefijo 'api' para que tus rutas sean /api/auth, /api/patients, etc.
+@Controller()
 export class AppController {
   constructor(private readonly appService: AppService) {}
 
@@ -111,12 +111,43 @@ export class AppController {
 
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('admin', 'doctor')
-  @Get('history/:patientId') // ✅ Define la ruta
+  @Get('history/:patientId')
   async getHistory(
-    @Param('patientId') patientId: string, // 👈 ¡ESTO FALTABA! Captura el ID
+    @Param('patientId') patientId: string,
     @Headers('authorization') authHeader: string,
   ) {
-    // Ahora pasamos AMBOS: el ID para buscar y el Header por si acaso
     return this.appService.proxyGetHistory(patientId, authHeader);
+  }
+
+  // --- 📂 ARCHIVOS / FILES (NUEVO) ---
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'doctor') // Solo doctores y admin suben radiografías
+  @Post('files/presigned-url')
+  async getPresignedUrl(
+    @Body() body: any,
+    @Headers('authorization') authHeader: string,
+  ) {
+    return this.appService.proxyGeneratePresignedUrl(body, authHeader);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'doctor')
+  @Post('files/confirm')
+  async confirmUpload(
+    @Body() body: any,
+    @Headers('authorization') authHeader: string,
+  ) {
+    return this.appService.proxyConfirmUpload(body, authHeader);
+  }
+
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('admin', 'doctor')
+  @Get('files/patient/:patientId')
+  async getPatientFiles(
+    @Param('patientId') patientId: string,
+    @Headers('authorization') authHeader: string,
+  ) {
+    return this.appService.proxyGetPatientFiles(patientId, authHeader);
   }
 }
