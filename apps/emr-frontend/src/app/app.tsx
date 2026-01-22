@@ -8,14 +8,15 @@ import {
 import Login from '../pages/login';
 import PatientsList from '../pages/patients-list';
 import { AppointmentsPage } from '../pages/appointments';
-// 👇 1. IMPORTAMOS LA NUEVA PÁGINA DE HISTORIAL
 import { HistoryPage } from '../pages/HistoryPage';
+
+// 👇 IMPORTAMOS EL CONTEXTO (La "Antena")
+import { NotificationProvider } from './context/NotificationContext';
 
 export function App() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Definimos que si la ruta es "/", entonces estamos en el Login
   const isLoginPage = location.pathname === '/';
 
   const handleLogout = () => {
@@ -24,78 +25,74 @@ export function App() {
   };
 
   return (
-    <div>
-      {/* --- 🧭 BARRA DE NAVEGACIÓN --- */}
-      {!isLoginPage && (
-        <nav
-          style={{
-            padding: '15px',
-            borderBottom: '1px solid #ccc',
-            background: '#f8f9fa',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-          }}
-        >
-          {/* Lado Izquierdo: Links de navegación */}
-          <div>
-            <Link
-              to="/patients"
-              style={{
-                marginRight: '15px',
-                fontWeight: 'bold',
-                textDecoration: 'none',
-                color: '#333',
-              }}
-            >
-              👥 Pacientes
-            </Link>
-            <Link
-              to="/appointments"
-              style={{
-                fontWeight: 'bold',
-                textDecoration: 'none',
-                color: '#333',
-              }}
-            >
-              📅 Agenda
-            </Link>
-          </div>
-
-          {/* Lado Derecho: Botón de Salir */}
-          <button
-            onClick={handleLogout}
+    // 👇 ENVOLVEMOS TODO CON EL PROVIDER
+    // Así el Snackbar (Toast) puede aparecer encima de cualquier cosa
+    <NotificationProvider>
+      <div>
+        {/* --- 🧭 BARRA DE NAVEGACIÓN --- */}
+        {!isLoginPage && (
+          <nav
             style={{
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              border: '1px solid #ccc',
-              padding: '5px 10px',
-              borderRadius: '4px',
-              background: 'white',
-              color: 'red',
+              padding: '15px',
+              borderBottom: '1px solid #ccc',
+              background: '#f8f9fa',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
             }}
           >
-            🚪 Salir
-          </button>
-        </nav>
-      )}
+            {/* Lado Izquierdo: Links de navegación */}
+            <div>
+              <Link
+                to="/patients"
+                style={{
+                  marginRight: '15px',
+                  fontWeight: 'bold',
+                  textDecoration: 'none',
+                  color: '#333',
+                }}
+              >
+                👥 Pacientes
+              </Link>
+              <Link
+                to="/appointments"
+                style={{
+                  fontWeight: 'bold',
+                  textDecoration: 'none',
+                  color: '#333',
+                }}
+              >
+                📅 Agenda
+              </Link>
+            </div>
 
-      {/* --- 🛣️ RUTAS DE LA APLICACIÓN --- */}
-      <Routes>
-        {/* Ruta raíz: Login */}
-        <Route path="/" element={<Login />} />
+            {/* Lado Derecho: Botón de Salir */}
+            <button
+              onClick={handleLogout}
+              style={{
+                cursor: 'pointer',
+                fontWeight: 'bold',
+                border: '1px solid #ccc',
+                padding: '5px 10px',
+                borderRadius: '4px',
+                background: 'white',
+                color: 'red',
+              }}
+            >
+              🚪 Salir
+            </button>
+          </nav>
+        )}
 
-        {/* Ruta /patients: Lista de Pacientes (PostgreSQL) */}
-        <Route path="/patients" element={<PatientsList />} />
-
-        {/* Ruta /appointments: Agenda (PostgreSQL) */}
-        <Route path="/appointments" element={<AppointmentsPage />} />
-
-        {/* 👇 2. NUEVA RUTA DINÁMICA: Historial (DynamoDB) */}
-        {/* :id captura el número de cédula que pasemos en la URL */}
-        <Route path="/patients/:id/history" element={<HistoryPage />} />
-      </Routes>
-    </div>
+        {/* --- 🛣️ RUTAS DE LA APLICACIÓN --- */}
+        <Routes>
+          <Route path="/" element={<Login />} />
+          <Route path="/patients" element={<PatientsList />} />
+          <Route path="/appointments" element={<AppointmentsPage />} />
+          <Route path="/patients/:id/history" element={<HistoryPage />} />
+        </Routes>
+      </div>
+    </NotificationProvider>
   );
 }
 
