@@ -10,6 +10,9 @@ export class AppService {
   private readonly PATIENTS_URL = 'http://localhost:3333/api'; // svc-patients
   private readonly APPOINTMENTS_URL = 'http://localhost:3001/api'; // svc-appointments
 
+  // 👇 NUEVO: URL del Microservicio de Archivos
+  private readonly FILES_URL = 'http://localhost:3005/api'; // svc-files
+
   constructor(
     private readonly httpService: HttpService,
     // 👇 Inyectamos el cliente de historia configurado en el AppModule
@@ -144,6 +147,44 @@ export class AppService {
         ),
       );
       return data;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  // --- 📂 ARCHIVOS / FILES (NUEVO) ---
+
+  async proxyGeneratePresignedUrl(data: any, authHeader: string) {
+    try {
+      // POST http://localhost:3004/presigned-url
+      const { data: response } = await firstValueFrom(
+        this.httpService.post(`${this.FILES_URL}/presigned-url`, data),
+      );
+      return response;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async proxyConfirmUpload(data: any, authHeader: string) {
+    try {
+      // POST http://localhost:3004/confirm
+      const { data: response } = await firstValueFrom(
+        this.httpService.post(`${this.FILES_URL}/confirm`, data),
+      );
+      return response;
+    } catch (error) {
+      this.handleError(error);
+    }
+  }
+
+  async proxyGetPatientFiles(patientId: string, authHeader: string) {
+    try {
+      // GET http://localhost:3004/patient/:id
+      const { data: response } = await firstValueFrom(
+        this.httpService.get(`${this.FILES_URL}/patient/${patientId}`),
+      );
+      return response;
     } catch (error) {
       this.handleError(error);
     }
