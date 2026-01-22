@@ -39,9 +39,7 @@ services:
     networks:
       - emr-network
 
-  # ❌ MONGODB ELIMINADO
-
-  # ✅ 4. DynamoDB Local (NUEVO) - PUERTO 8000
+  # ✅ 4. DynamoDB Local
   dynamodb-local:
     image: 'amazon/dynamodb-local:latest'
     container_name: dynamo-local
@@ -70,7 +68,7 @@ services:
     networks:
       - emr-network
 
-    # 6. Base de Datos para ARCHIVOS (Metadatos)
+  # 6. Base de Datos para ARCHIVOS (Metadatos)
   emr-postgres-files:
     image: postgres:15
     container_name: emr-postgres-files
@@ -80,7 +78,7 @@ services:
       POSTGRES_PASSWORD: adminpassword
       POSTGRES_DB: files_db
     ports:
-      - '5437:5432' # Puerto expuesto en el host: 5437
+      - '5437:5432'
     volumes:
       - postgres_files_data:/var/lib/postgresql/data
     networks:
@@ -102,7 +100,7 @@ services:
     networks:
       - emr-network
 
-  # 8. Job para crear el Bucket automáticamente (Init Container)
+  # 8. Job para crear el Bucket automáticamente
   createbuckets:
     image: minio/mc
     depends_on:
@@ -117,12 +115,30 @@ services:
     networks:
       - emr-network
 
+  # 👇 9. (NUEVO) n8n - Automatización de Workflows
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: emr-n8n
+    restart: always
+    ports:
+      - '5678:5678'
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - emr-network
+
 volumes:
   postgres_data:
   postgres_appointments_data:
-  #Nuevos volumenes
   postgres_files_data:
   minio_data:
+  # 👇 Volumen nuevo para n8n
+  n8n_data:
 
 networks:
   emr-network:

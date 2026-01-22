@@ -14,7 +14,17 @@ export class AppController {
     await this.appService.createInitialHistory(data);
   }
 
-  // 2. RECEPTOR DE EVENTOS: CITA COMPLETADA (RabbitMQ - Fire & Forget)
+  // 👇 2. (NUEVO) RECEPTOR DE EVENTOS: CITA CREADA (Para evitar el error de RabbitMQ)
+  @EventPattern('appointment_created')
+  async handleAppointmentCreated(@Payload() data: any) {
+    console.log(
+      `✅ [HISTORY-SVC] Evento appointment_created recibido. Paciente: ${data.patientId}`,
+    );
+    // Por ahora solo logueamos para cumplir el contrato del evento.
+    // En el futuro, aquí podríamos iniciar un borrador de historia o validaciones CQRS.
+  }
+
+  // 3. RECEPTOR DE EVENTOS: CITA COMPLETADA (RabbitMQ - Fire & Forget)
   @EventPattern('appointment_completed')
   async handleAppointmentCompleted(@Payload() data: any) {
     console.log(
@@ -25,8 +35,7 @@ export class AppController {
     await this.appService.addEntryFromAppointment(data);
   }
 
-  // 3. RESPONDEDOR DE PETICIONES (Request-Response)
-  // 👇 ESTE ES EL CAMBIO CLAVE QUE SOLUCIONA EL ERROR 500 👇
+  // 4. RESPONDEDOR DE PETICIONES (Request-Response)
   @MessagePattern({ cmd: 'get_histories_by_patient' })
   async handleGetHistories(@Payload() patientId: string) {
     console.log(

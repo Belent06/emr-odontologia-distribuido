@@ -1,6 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { ClientsModule, Transport } from '@nestjs/microservices'; // 👈 1. Importamos ClientsModule
+import { ClientsModule, Transport } from '@nestjs/microservices';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { Appointment } from './appointment.entity';
@@ -19,18 +19,26 @@ import { Appointment } from './appointment.entity';
     }),
     TypeOrmModule.forFeature([Appointment]),
 
-    // 👇 2. CONFIGURACIÓN DEL EMISOR RABBITMQ 👇
-    // Esto permite que este microservicio envíe mensajes a la cola 'history_queue'
+    // 👇 CONFIGURACIÓN DE EMISORES RABBITMQ 👇
     ClientsModule.register([
+      // 1. Cliente hacia HISTORIAL
       {
-        name: 'HISTORY_SERVICE', // Nombre que usaremos para inyectar en el servicio (@Inject)
+        name: 'HISTORY_SERVICE',
+        transport: 5, // Es más limpio usar el Enum que el número 5
+        options: {
+          urls: ['amqp://localhost:5672'],
+          queue: 'history_queue',
+          queueOptions: { durable: false },
+        },
+      },
+      // 👇 2. (NUEVO) Cliente hacia NOTIFICACIONES
+      {
+        name: 'NOTIFICATIONS_SERVICE', // Este nombre se usará en el @Inject del Service
         transport: 5,
         options: {
-          urls: ['amqp://localhost:5672'], // URL de tu RabbitMQ (Docker)
-          queue: 'history_queue', // La cola que escucha svc-history
-          queueOptions: {
-            durable: false,
-          },
+          urls: ['amqp://localhost:5672'],
+          queue: 'notifications_queue', // Debe coincidir con el main.ts de svc-notifications
+          queueOptions: { durable: false },
         },
       },
     ]),

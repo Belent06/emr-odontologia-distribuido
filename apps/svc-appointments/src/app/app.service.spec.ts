@@ -6,36 +6,42 @@ import { Appointment } from './appointment.entity';
 describe('AppService', () => {
   let service: AppService;
 
-  // 1. Mock del Repositorio de TypeORM (Base de Datos Falsa)
+  // 1. Mock del Repositorio TypeORM
   const mockRepository = {
     create: jest.fn(),
     save: jest.fn(),
     find: jest.fn(),
     findOne: jest.fn(),
-    update: jest.fn(),
-    delete: jest.fn(),
+    createQueryBuilder: jest.fn(() => ({
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      getOne: jest.fn().mockResolvedValue(null),
+    })),
   };
 
-  // 2. Mock de RabbitMQ (Servicio de Mensajería Falso)
-  const mockHistoryClient = {
+  // 2. Mock del Cliente RabbitMQ (Sirve para ambos servicios)
+  const mockClientProxy = {
     emit: jest.fn(),
-    send: jest.fn(),
   };
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AppService,
-        // 👇 Inyectamos el Mock del Repositorio de Citas
+        // Mock de la Base de Datos
         {
           provide: getRepositoryToken(Appointment),
           useValue: mockRepository,
         },
-        // 👇 Inyectamos el Mock de RabbitMQ ('HISTORY_SERVICE')
-        // El error decía explícitamente que faltaba este proveedor
+        // Mock del servicio de Historial
         {
           provide: 'HISTORY_SERVICE',
-          useValue: mockHistoryClient,
+          useValue: mockClientProxy,
+        },
+        // 👇 AQUÍ ESTABA EL ERROR: Faltaba inyectar este mock
+        {
+          provide: 'NOTIFICATIONS_SERVICE',
+          useValue: mockClientProxy,
         },
       ],
     }).compile();
