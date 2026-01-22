@@ -1,20 +1,50 @@
-import { Test } from '@nestjs/testing';
-import { AppService } from './app.service';
+import { Test, TestingModule } from '@nestjs/testing';
 
-describe('AppService', () => {
-  let service: AppService;
+// 👇 SOLUCIÓN MÁGICA: Mockeamos 'uuid' ANTES de los imports.
+// Esto evita que Jest intente leer el archivo que causa el error "Unexpected token export".
+jest.mock('uuid', () => ({
+  v4: () => 'test-uuid-1234',
+}));
 
-  beforeAll(async () => {
-    const app = await Test.createTestingModule({
-      providers: [AppService],
+import { FilesService } from './app.service';
+import { getRepositoryToken } from '@nestjs/typeorm';
+import { FileMetadata } from './file-metadata.entity';
+import { S3_CLIENT_TOKEN } from './s3.provider';
+
+describe('FilesService', () => {
+  let service: FilesService;
+
+  // Mock de TypeORM
+  const mockRepository = {
+    create: jest.fn(),
+    save: jest.fn(),
+    find: jest.fn(),
+  };
+
+  // Mock de S3
+  const mockS3Client = {
+    send: jest.fn().mockResolvedValue({}),
+  };
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        FilesService,
+        {
+          provide: getRepositoryToken(FileMetadata),
+          useValue: mockRepository,
+        },
+        {
+          provide: S3_CLIENT_TOKEN,
+          useValue: mockS3Client,
+        },
+      ],
     }).compile();
 
-    service = app.get<AppService>(AppService);
+    service = module.get<FilesService>(FilesService);
   });
 
-  describe('getData', () => {
-    it('should return "Hello API"', () => {
-      expect(service.getData()).toEqual({ message: 'Hello API' });
-    });
+  it('should be defined', () => {
+    expect(service).toBeDefined();
   });
 });
