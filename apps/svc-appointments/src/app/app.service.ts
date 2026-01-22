@@ -3,11 +3,11 @@ import {
   BadRequestException,
   ConflictException,
   NotFoundException,
-  Inject, // 👈 1. Necesario para inyectar el cliente
+  Inject,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { ClientProxy } from '@nestjs/microservices'; // 👈 2. Necesario para tipar el cliente
+import { ClientProxy } from '@nestjs/microservices';
 import { Appointment } from './appointment.entity';
 
 @Injectable()
@@ -16,8 +16,12 @@ export class AppService {
     @InjectRepository(Appointment)
     private readonly appointmentRepo: Repository<Appointment>,
 
-    // 👇 3. INYECTAMOS EL CLIENTE RABBITMQ (Debe coincidir con el nombre en app.module)
+    // 1. Cliente hacia HISTORIAL (Legacy / Registro Clínico)
     @Inject('HISTORY_SERVICE') private readonly historyClient: ClientProxy,
+
+    // 👇 2. NUEVO: Cliente hacia NOTIFICACIONES (WhatsApp / Alertas)
+    @Inject('NOTIFICATIONS_SERVICE')
+    private readonly notificationsClient: ClientProxy,
   ) {}
 
   // 1. Ver todas las citas
@@ -75,10 +79,30 @@ export class AppService {
       status: 'PENDING',
     });
 
-    return this.appointmentRepo.save(newAppointment);
+    const savedAppointment = await this.appointmentRepo.save(newAppointment);
+
+    // 👇 ESTRATEGIA DE DOBLE DESPACHO (Double Dispatch)
+    console.log(
+      `📢 [APPOINTMENTS-SVC] Cita creada ID: ${savedAppointment.id}. Emitiendo eventos distribuidos...`,
+    );
+
+    const eventPayload = {
+      appointmentId: savedAppointment.id,
+      patientId: savedAppointment.patientId,
+      doctorId: savedAppointment.doctorId,
+      date: savedAppointment.date,
+    };
+
+    // Canal A: Historial (Para evitar error de "No handler")
+    this.historyClient.emit('appointment_created', eventPayload);
+
+    // Canal B: Notificaciones (Para n8n y WebSockets)
+    this.notificationsClient.emit('appointment_created', eventPayload);
+
+    return savedAppointment;
   }
 
-  // 👇 3. MÉTODO EDITADO: Disparar evento al completar
+  // 3. Actualizar estado
   async updateStatus(id: string, status: string): Promise<Appointment> {
     const appointment = await this.appointmentRepo.findOne({ where: { id } });
 
@@ -89,7 +113,7 @@ export class AppService {
     appointment.status = status;
     const updatedAppointment = await this.appointmentRepo.save(appointment);
 
-    // 🚀 EVENTO: Si la cita se completó, avisamos a History por RabbitMQ
+    // 🚀 EVENTO: Si la cita se completó, avisamos a History
     if (status === 'COMPLETED') {
       console.log(
         `🚀 [APPOINTMENTS-SVC] Cita ${id} completada. Enviando evento a History...`,

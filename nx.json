@@ -44,7 +44,8 @@
         "apps/api-gateway-e2e/**/*",
         "apps/svc-history-e2e/**/*",
         "apps/svc-appointments-e2e/**/*",
-        "apps/svc-files-e2e/**/*"
+        "apps/svc-files-e2e/**/*",
+        "apps/svc-notifications-e2e/**/*"
       ]
     },
     {
