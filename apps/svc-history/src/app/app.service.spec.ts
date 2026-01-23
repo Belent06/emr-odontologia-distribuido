@@ -1,34 +1,35 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { AppService } from './app.service';
 
-// 👇 MOCK DE DYNAMODB (IMPORTANTE)
-const mockPut = jest.fn().mockReturnValue({ promise: jest.fn() });
-const mockQuery = jest
-  .fn()
-  .mockReturnValue({ promise: jest.fn().mockResolvedValue({ Items: [] }) });
-const mockScan = jest
-  .fn()
-  .mockReturnValue({ promise: jest.fn().mockResolvedValue({ Items: [] }) });
-
+// Mockeamos la librería aws-sdk para que no pida credenciales reales
 jest.mock('aws-sdk', () => {
   return {
     DynamoDB: {
       DocumentClient: jest.fn(() => ({
-        put: mockPut,
-        query: mockQuery,
-        scan: mockScan,
+        put: jest.fn().mockReturnThis(),
+        query: jest.fn().mockReturnThis(),
+        scan: jest.fn().mockReturnThis(),
+        promise: jest.fn().mockResolvedValue({ Items: [] }),
       })),
     },
   };
 });
 
 describe('AppService', () => {
-  // ... resto del test igual ...
   let service: AppService;
 
   beforeEach(async () => {
     const module: TestingModule = await Test.createTestingModule({
-      providers: [AppService],
+      providers: [
+        AppService,
+        // 👇 SOLUCIÓN: Simulamos el cliente de auditoría
+        {
+          provide: 'AUDIT_SERVICE',
+          useValue: {
+            emit: jest.fn(), // Simulamos la función emit
+          },
+        },
+      ],
     }).compile();
 
     service = module.get<AppService>(AppService);

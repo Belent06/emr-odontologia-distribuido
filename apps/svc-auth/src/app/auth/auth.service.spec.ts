@@ -10,14 +10,20 @@ describe('AuthService', () => {
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         AuthService,
-        // Mock de UsersService
+        // 👇 1. Mock de Auditoría
+        {
+          provide: 'AUDIT_SERVICE',
+          useValue: { emit: jest.fn() },
+        },
+        // 👇 2. Mock de UsersService (Dependencia existente)
         {
           provide: UsersService,
           useValue: {
-            findOne: jest.fn(),
+            create: jest.fn(),
+            findOneByEmail: jest.fn(),
           },
         },
-        // Mock de JwtService
+        // 👇 3. Mock de JwtService (Dependencia existente)
         {
           provide: JwtService,
           useValue: {
