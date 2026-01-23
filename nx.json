@@ -46,7 +46,8 @@
         "apps/svc-appointments-e2e/**/*",
         "apps/svc-files-e2e/**/*",
         "apps/svc-notifications-e2e/**/*",
-        "apps/svc-backup-e2e/**/*"
+        "apps/svc-backup-e2e/**/*",
+        "apps/svc-audit-e2e/**/*"
       ]
     },
     {

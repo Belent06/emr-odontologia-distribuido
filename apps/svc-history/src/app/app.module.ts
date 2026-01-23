@@ -1,22 +1,29 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
-// Mantenemos ClientsModule para que RabbitMQ siga funcionando
 import { ClientsModule, Transport } from '@nestjs/microservices';
 
 @Module({
   imports: [
-    // 👇 CONFIGURACIÓN DE RABBITMQ (INTACTA) 👇
     ClientsModule.register([
+      // 1. Configuración existente (NO TOCAR)
       {
         name: 'HISTORY_SERVICE',
-        transport: 5, // Transport.RMQ
+        transport: 5,
         options: {
-          urls: ['amqp://localhost:5672'], // Docker local
+          urls: ['amqp://localhost:5672'],
           queue: 'history_queue',
-          queueOptions: {
-            durable: false,
-          },
+          queueOptions: { durable: false },
+        },
+      },
+      // 2. 👇 NUEVO: Cliente para Auditoría
+      {
+        name: 'AUDIT_SERVICE',
+        transport: Transport.RMQ,
+        options: {
+          urls: ['amqp://localhost:5672'],
+          queue: 'audit_queue', // Misma cola que svc-audit
+          queueOptions: { durable: true },
         },
       },
     ]),
