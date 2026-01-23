@@ -21,9 +21,12 @@ export class PatientsService {
     @InjectRepository(Patient)
     private readonly patientRepository: Repository<Patient>,
 
-    // 👇 CAMBIO: Usamos 'HISTORY_SERVICE' que es el nombre que definimos en el modulo
     @Inject('HISTORY_SERVICE')
     private readonly historyClient: ClientProxy,
+
+    // 👇 INYECTAR CLIENTE DE AUDITORÍA
+    @Inject('AUDIT_SERVICE')
+    private readonly auditClient: ClientProxy,
 
     @Inject(CACHE_MANAGER)
     private cacheManager: Cache,
@@ -38,10 +41,21 @@ export class PatientsService {
 
       const savedPatient = await this.patientRepository.save(patient);
 
-      // 📣 Evento RabbitMQ: Ahora historyClient envía el mensaje 🚀
+      // 1. Evento Original
       this.historyClient.emit('patient_created', savedPatient);
 
-      // 🧹 INVALIDAR CACHÉ
+      // 2. 👇 NUEVO: Evento de Auditoría
+      this.auditClient.emit('audit_event', {
+        action: 'PATIENT_CREATED',
+        resourceId: savedPatient.id,
+        actor: 'system', // Si tuvieras el ID del usuario en el request, ponlo aquí
+        timestamp: new Date(),
+        details: {
+          name: `${savedPatient.firstName} ${savedPatient.lastName}`,
+          email: savedPatient.email,
+        },
+      });
+
       await this.cacheManager.del(this.CACHE_KEY);
 
       return savedPatient;
@@ -55,11 +69,9 @@ export class PatientsService {
       this.CACHE_KEY,
     );
     if (cachedPatients) {
-      console.log('⚡ [REDIS] Retornando lista desde Caché');
       return cachedPatients;
     }
 
-    console.log('📦 [POSTGRES] Consultando Base de Datos...');
     const patients = await this.patientRepository.find();
     await this.cacheManager.set(this.CACHE_KEY, patients, 60000);
 
@@ -88,6 +100,15 @@ export class PatientsService {
     try {
       this.patientRepository.merge(patient, updatePatientDto);
       const updatedPatient = await this.patientRepository.save(patient);
+
+      // 👇 AUDITAR ACTUALIZACIÓN (Opcional pero recomendado)
+      this.auditClient.emit('audit_event', {
+        action: 'PATIENT_UPDATED',
+        resourceId: updatedPatient.id,
+        timestamp: new Date(),
+        details: { changes: Object.keys(updatePatientDto) },
+      });
+
       await this.cacheManager.del(this.CACHE_KEY);
       return updatedPatient;
     } catch (error) {
@@ -98,6 +119,15 @@ export class PatientsService {
   async remove(id: string): Promise<void> {
     const patient = await this.findOne(id);
     await this.patientRepository.remove(patient);
+
+    // 👇 AUDITAR ELIMINACIÓN
+    this.auditClient.emit('audit_event', {
+      action: 'PATIENT_DELETED',
+      resourceId: id,
+      timestamp: new Date(),
+      details: { deletedBy: 'admin' },
+    });
+
     await this.cacheManager.del(this.CACHE_KEY);
   }
 

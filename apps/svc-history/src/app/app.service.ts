@@ -1,5 +1,5 @@
-import { Injectable, Logger } from '@nestjs/common';
-// 👇 Usamos el SDK de AWS en lugar de Mongoose
+import { Injectable, Logger, Inject } from '@nestjs/common'; // 👈 Agregamos Inject
+import { ClientProxy } from '@nestjs/microservices'; // 👈 Agregamos ClientProxy
 import { DynamoDB } from 'aws-sdk';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -7,19 +7,23 @@ import { v4 as uuidv4 } from 'uuid';
 export class AppService {
   private readonly logger = new Logger('AppService');
 
-  // 👇 CLIENTE DYNAMODB COMPATIBLE CON LOCAL Y NUBE
   private readonly dynamoDb = new DynamoDB.DocumentClient({
     region: 'us-east-1',
     endpoint: process.env.DYNAMODB_ENDPOINT || 'http://localhost:8000',
     credentials: {
-      accessKeyId: 'fake', // Dynamo Local acepta esto
+      accessKeyId: 'fake',
       secretAccessKey: 'fake',
     },
   });
 
-  private readonly tableName = 'emr-history-table'; // ⚠️ Debes crearla con el script init-dynamo.js
+  private readonly tableName = 'emr-history-table';
 
-  // 1. GUARDAR ENTRADA (Command) - Viene de RabbitMQ
+  constructor(
+    // 👇 INYECTAMOS EL CLIENTE DE AUDITORÍA
+    @Inject('AUDIT_SERVICE') private readonly auditClient: ClientProxy,
+  ) {}
+
+  // 1. GUARDAR ENTRADA (Command)
   async addEntryFromAppointment(data: any) {
     this.logger.log(
       `📩 [DynamoDB] Persistiendo historial para: ${data.patientId}`,
@@ -27,17 +31,16 @@ export class AppService {
 
     const timestamp = new Date().toISOString();
 
-    // PATRÓN SINGLE-TABLE DESIGN
     const item = {
-      PK: `PACIENTE#${data.patientId}`, // Partition Key
-      SK: `HISTORIAL#${timestamp}`, // Sort Key
+      PK: `PACIENTE#${data.patientId}`,
+      SK: `HISTORIAL#${timestamp}`,
       Type: 'MEDICAL_NOTE',
       AppointmentId: data.appointmentId || uuidv4(),
       DoctorId: data.doctorId,
       Reason: data.reason,
       Details: data.notes || 'Sin notas',
       CreatedAt: timestamp,
-      PatientName: 'Paciente Referenciado', // Dato desnormalizado
+      PatientName: 'Paciente Referenciado',
     };
 
     try {
@@ -49,6 +52,20 @@ export class AppService {
         .promise();
 
       this.logger.log('✅ Item guardado en DynamoDB correctamente');
+
+      // 👇 AUDITAR: "Nota médica creada" (CRÍTICO)
+      this.auditClient.emit('audit_event', {
+        action: 'MEDICAL_HISTORY_CREATED',
+        resourceId: data.patientId, // Identificamos al paciente afectado
+        actor: 'system', // O data.doctorId si viene en el mensaje
+        timestamp: new Date(),
+        details: {
+          reason: data.reason,
+          appointmentId: item.AppointmentId,
+          doctor: data.doctorId,
+        },
+      });
+
       return item;
     } catch (error) {
       this.logger.error(`❌ Error DynamoDB Put: ${error.message}`);
@@ -56,8 +73,7 @@ export class AppService {
     }
   }
 
-  // 2. BUSCAR POR PACIENTE (Query) - Optimizado
-  // Este método reemplaza a la búsqueda general
+  // 2. BUSCAR POR PACIENTE (Query)
   async findAllByPatient(patientId: string) {
     this.logger.log(`🔍 [DynamoDB] Buscando historial de: ${patientId}`);
 
@@ -67,11 +83,24 @@ export class AppService {
       ExpressionAttributeValues: {
         ':pk': `PACIENTE#${patientId}`,
       },
-      ScanIndexForward: false, // false = Trae del más nuevo al más antiguo
+      ScanIndexForward: false,
     };
 
     try {
       const result = await this.dynamoDb.query(params).promise();
+
+      // Opcional: Auditar lectura de historial (Access Log)
+      // Si hay mucha carga, esto se suele evitar, pero para EMR es buena práctica.
+      /*
+      this.auditClient.emit('audit_event', {
+         action: 'MEDICAL_HISTORY_ACCESSED',
+         resourceId: patientId,
+         actor: 'system',
+         timestamp: new Date(),
+         details: { recordsFound: result.Count }
+      });
+      */
+
       return result.Items;
     } catch (error) {
       this.logger.error(`❌ Error DynamoDB Query: ${error.message}`);
@@ -79,9 +108,7 @@ export class AppService {
     }
   }
 
-  // ⚠️ MÉTODO LEGACY: findAll() (Escaneo total)
-  // Lo mantenemos TEMPORALMENTE para que tu API Gateway no falle si llama a "traer todo",
-  // pero esto es ineficiente en producción.
+  // 3. LEGACY SCAN
   async findAll() {
     this.logger.warn(
       '⚠️ [DynamoDB] SCAN ejecutado. Esto es costoso en producción.',
@@ -96,7 +123,6 @@ export class AppService {
     }
   }
 
-  // Método legacy de inicialización (ya no es necesario en Dynamo, dejamos log)
   async createInitialHistory(patientData: any) {
     this.logger.log(
       `ℹ️ [DynamoDB] Schemaless: No se requiere inicializar colección para ${patientData.id}`,
