@@ -1,0 +1,147 @@
+services:
+  # 1. Base de Datos para AUTH (Usuarios)
+  emr-postgres:
+    image: postgres:15
+    container_name: emr-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: emr_auth_db
+    ports:
+      - '5435:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - emr-network
+
+  # 2. Redis - Cache
+  emr-redis:
+    image: redis:7-alpine
+    container_name: emr-redis
+    restart: always
+    ports:
+      - '6379:6379'
+    networks:
+      - emr-network
+
+  # 3. RabbitMQ - Mensajería
+  emr-rabbitmq:
+    image: rabbitmq:3-management
+    container_name: emr-rabbitmq
+    restart: always
+    ports:
+      - '5672:5672'
+      - '15672:15672'
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    networks:
+      - emr-network
+
+  # 4. DynamoDB Local
+  dynamodb-local:
+    image: 'amazon/dynamodb-local:latest'
+    container_name: dynamo-local
+    ports:
+      - '8000:8000'
+    command: '-jar DynamoDBLocal.jar -sharedDb -dbPath ./data'
+    volumes:
+      - './docker/dynamodb:/home/dynamodblocal/data'
+    working_dir: /home/dynamodblocal
+    networks:
+      - emr-network
+
+  # 5. Base de Datos para AGENDA
+  emr-postgres-appointments:
+    image: postgres:15
+    container_name: emr-postgres-appointments
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: appointments_db
+    ports:
+      - '5436:5432'
+    volumes:
+      - postgres_appointments_data:/var/lib/postgresql/data
+    networks:
+      - emr-network
+
+  # 6. Base de Datos para ARCHIVOS (Metadatos)
+  emr-postgres-files:
+    image: postgres:15
+    container_name: emr-postgres-files
+    restart: always
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: adminpassword
+      POSTGRES_DB: files_db
+    ports:
+      - '5437:5432'
+    volumes:
+      - postgres_files_data:/var/lib/postgresql/data
+    networks:
+      - emr-network
+
+  # 7. MinIO (Simulador S3) - Storage
+  minio:
+    image: minio/minio
+    container_name: emr-minio
+    ports:
+      - '9000:9000' # API S3
+      - '9001:9001' # Consola Web
+    environment:
+      MINIO_ROOT_USER: root
+      MINIO_ROOT_PASSWORD: password123
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    networks:
+      - emr-network
+
+  # 8. Job para crear los Buckets automáticamente
+  createbuckets:
+    image: minio/mc
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      /usr/bin/mc config host add myminio http://minio:9000 root password123;
+      # Bucket 1: Archivos (Público/App)
+      /usr/bin/mc mb myminio/emr-files;
+      /usr/bin/mc policy set download myminio/emr-files;
+      # 👇 Bucket 2: Backups (Privado/Sistema) - NUEVO
+      /usr/bin/mc mb myminio/emr-backups;
+      exit 0;
+      "
+    networks:
+      - emr-network
+
+  # 9. n8n - Automatización de Workflows
+  n8n:
+    image: docker.n8n.io/n8nio/n8n
+    container_name: emr-n8n
+    restart: always
+    ports:
+      - '5678:5678'
+    environment:
+      - N8N_HOST=localhost
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=http
+      - WEBHOOK_URL=http://localhost:5678/
+    volumes:
+      - n8n_data:/home/node/.n8n
+    networks:
+      - emr-network
+
+volumes:
+  postgres_data:
+  postgres_appointments_data:
+  postgres_files_data:
+  minio_data:
+  n8n_data:
+
+networks:
+  emr-network:
+    driver: bridge

@@ -1,0 +1,37 @@
+name: CI - Integración Continua
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+  pull_request:
+
+jobs:
+  main:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # 1. Configurar Node.js y Cache
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # 2. Instalar dependencias
+      - run: npm ci
+
+      # 3. Nx Setup (Detecta qué cambió comparado con la rama base)
+      - uses: nrwl/nx-set-shas@v4
+
+      # 4. LINT: Revisa calidad de código en proyectos afectados
+      - run: npx nx affected -t lint
+
+      # 5. TEST: Corre pruebas unitarias en proyectos afectados
+      - run: npx nx affected -t test
+
+      # 6. BUILD: Intenta compilar para asegurar que no hay errores de sintaxis
+      - run: npx nx affected -t build
