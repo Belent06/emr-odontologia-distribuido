@@ -39,7 +39,7 @@ services:
     networks:
       - emr-network
 
-  # ✅ 4. DynamoDB Local
+  # 4. DynamoDB Local
   dynamodb-local:
     image: 'amazon/dynamodb-local:latest'
     container_name: dynamo-local
@@ -100,7 +100,7 @@ services:
     networks:
       - emr-network
 
-  # 8. Job para crear el Bucket automáticamente
+  # 8. Job para crear los Buckets automáticamente
   createbuckets:
     image: minio/mc
     depends_on:
@@ -108,14 +108,17 @@ services:
     entrypoint: >
       /bin/sh -c "
       /usr/bin/mc config host add myminio http://minio:9000 root password123;
+      # Bucket 1: Archivos (Público/App)
       /usr/bin/mc mb myminio/emr-files;
       /usr/bin/mc policy set download myminio/emr-files;
+      # 👇 Bucket 2: Backups (Privado/Sistema) - NUEVO
+      /usr/bin/mc mb myminio/emr-backups;
       exit 0;
       "
     networks:
       - emr-network
 
-  # 👇 9. (NUEVO) n8n - Automatización de Workflows
+  # 9. n8n - Automatización de Workflows
   n8n:
     image: docker.n8n.io/n8nio/n8n
     container_name: emr-n8n
@@ -137,7 +140,6 @@ volumes:
   postgres_appointments_data:
   postgres_files_data:
   minio_data:
-  # 👇 Volumen nuevo para n8n
   n8n_data:
 
 networks:
