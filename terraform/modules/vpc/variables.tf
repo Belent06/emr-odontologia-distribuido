@@ -1,31 +1,22 @@
-# terraform/modules/vpc/variables.tf
-
-variable "project_name" {
-  description = "Nombre del proyecto (ej. emr-odonto)"
-  type        = string
-}
-
-variable "environment" {
-  description = "Entorno de despliegue (qa, prod)"
-  type        = string
-}
-
-variable "aws_region" {
-  description = "Región de AWS (ej. us-east-1)"
+variable "env" {
+  description = "Entorno (qa, prod)"
   type        = string
 }
 
 variable "vpc_cidr" {
-  description = "Rango IP de la VPC"
+  description = "Rango de IP para la VPC"
   type        = string
+  default     = "10.0.0.0/16"
 }
 
-variable "public_subnet_cidr" {
-  description = "Rango IP Subred Publica"
-  type        = string
+variable "public_subnets" {
+  description = "Lista de rangos IP para subnets publicas"
+  type        = list(string)
+  default     = ["10.0.1.0/24", "10.0.2.0/24"]
 }
 
-variable "private_subnet_cidr" {
-  description = "Rango IP Subred Privada"
-  type        = string
+variable "private_subnets" {
+  description = "Lista de rangos IP para subnets privadas"
+  type        = list(string)
+  default     = ["10.0.10.0/24", "10.0.11.0/24"]
 }
