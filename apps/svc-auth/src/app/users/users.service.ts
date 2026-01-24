@@ -2,6 +2,8 @@ import {
   BadRequestException,
   Injectable,
   InternalServerErrorException,
+  OnModuleInit, // 👈 1. Importamos esto
+  Logger, // 👈 2. Importamos esto para logs bonitos
 } from '@nestjs/common';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
@@ -11,39 +13,74 @@ import { User } from './entities/user.entity';
 import * as bcrypt from 'bcrypt';
 
 @Injectable()
-export class UsersService {
+export class UsersService implements OnModuleInit {
+  // 👈 3. Implementamos la interfaz
+  private readonly logger = new Logger(UsersService.name);
+
   constructor(
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
   ) {}
 
+  // 👇 4. LÓGICA DE LA SEMILLA (SEED)
+  async onModuleInit() {
+    await this.seedAdmin();
+  }
+
+  private async seedAdmin() {
+    try {
+      // Verificamos si la tabla está vacía
+      const count = await this.userRepository.count();
+
+      if (count === 0) {
+        this.logger.log(
+          '🌱 Base de datos vacía detectada. Creando usuario Doctor Admin...',
+        );
+
+        const adminPassword = 'password123';
+        const adminEmail = 'doctor@test.com';
+
+        const admin = this.userRepository.create({
+          email: adminEmail,
+          username: adminEmail, // Respetamos tu fix crítico: username = email
+          password: bcrypt.hashSync(adminPassword, 10),
+          name: 'Doctor Admin',
+          roles: ['admin', 'doctor'], // Roles por defecto
+          isActive: true, // Asumimos que tienes este campo, si no, bórralo
+        });
+
+        await this.userRepository.save(admin);
+        this.logger.log(`✅ Usuario Creado: ${adminEmail} / ${adminPassword}`);
+      } else {
+        this.logger.log(
+          'ℹ️ La base de datos ya tiene usuarios. Saltando Seed.',
+        );
+      }
+    } catch (error) {
+      this.logger.error('❌ Error ejecutando el Seed', error);
+    }
+  }
+  // ---------------------------------------------------------
+
   async findOneByEmail(email: string) {
     return await this.userRepository.findOne({
       where: { email },
-      // Como pusimos 'select: false' en la entidad, aquí debemos pedirla explícitamente para validar
       select: ['id', 'email', 'password', 'roles', 'name'],
     });
   }
 
   async create(createUserDto: CreateUserDto) {
     try {
-      // 1. Extraemos email y password explícitamente
       const { password, email, ...userData } = createUserDto;
 
-      // 2. Creamos la entidad
       const user = this.userRepository.create({
         ...userData,
-        email, // Guardamos el email
-        // ---> FIX CRÍTICO AQUÍ <---
-        username: email, // Usamos el email como username para satisfacer a la BD
-        // -------------------------
+        email,
+        username: email, // Tu FIX CRÍTICO
         password: bcrypt.hashSync(password, 10),
       });
 
-      // 3. Guardar en base de datos
       await this.userRepository.save(user);
-
-      // 4. Limpiar la respuesta (¡NUNCA devolver la contraseña!)
       delete user.password;
       return user;
     } catch (error) {
@@ -58,11 +95,9 @@ export class UsersService {
   }
 
   async findOne(id: string) {
-    // Implementaremos esto mejor luego
     return `This action returns a #${id} user`;
   }
 
-  // Método auxiliar para buscar por nombre de usuario (Vital para el Login)
   async findOneByUsername(username: string) {
     return this.userRepository.findOne({
       where: { username },
@@ -77,7 +112,6 @@ export class UsersService {
     return `This action removes a #${id} user`;
   }
 
-  // Manejo de errores centralizado
   private handleDBErrors(error: any): never {
     if (error.code === '23505') {
       throw new BadRequestException('El nombre de usuario (o email) ya existe');

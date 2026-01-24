@@ -1,0 +1,29 @@
+# .dockerignore
+
+# Ignorar dependencias locales (se instalan dentro del contenedor)
+node_modules/
+
+# Ignorar compilaciones previas
+dist/
+build/
+
+# Ignorar sistema de control de versiones
+.git/
+.gitignore
+
+# Ignorar configuraciones de entorno local
+.env
+docker-compose.yml
+docker-compose.*.yml
+
+# 👇 IMPORTANTE: Ignorar datos de tus contenedores locales (Postgres, Minio, etc)
+docker/
+postgres_data/
+minio_data/
+n8n_data/
+
+# Ignorar logs y temporales
+npm-debug.log
+yarn-error.log
+.DS_Store
+coverage/
