@@ -1,96 +1,136 @@
-# EmrOdontologia
+# 🦷 EMR Odontología - Sistema de Gestión Médica (Entorno Local)
 
-<a alt="Nx logo" href="https://nx.dev" target="_blank" rel="noreferrer"><img src="https://raw.githubusercontent.com/nrwl/nx/master/images/nx-logo.png" width="45"></a>
+![NestJS](https://img.shields.io/badge/Backend-NestJS-red)
+![Nx](https://img.shields.io/badge/Monorepo-Nx-blue)
+![Docker](https://img.shields.io/badge/Infra-Docker_Compose-blue)
+![TypeScript](https://img.shields.io/badge/Language-TypeScript-yellow)
 
-✨ Your new, shiny [Nx workspace](https://nx.dev) is ready ✨.
+Sistema de **Expediente Médico Electrónico (EMR)** para odontología, construido bajo una arquitectura de **microservicios** utilizando un monorepo con **Nx**.
+Diseñado para ser **modular, escalable y fácil de mantener**, ejecutándose completamente en un **entorno local** con Docker.
 
-[Learn more about this workspace setup and its capabilities](https://nx.dev/getting-started/intro#learn-nx?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects) or run `npx nx graph` to visually explore what was created. Now, let's get you up to speed!
+---
 
-## Run tasks
+## 🏗️ Arquitectura del Sistema (Local)
 
-To run tasks with Nx use:
+El sistema utiliza un patrón de **API Gateway** como único punto de entrada para el cliente (Frontend).
+Los microservicios se comunican mediante **REST** y **mensajería asíncrona (RabbitMQ)** para auditoría y notificaciones.
 
-```sh
-npx nx <target> <project-name>
+```mermaid
+graph TD
+    Client[Frontend / Postman] -->|HTTP Request| Gateway[API Gateway]
+
+    subgraph "Microservicios (NestJS)"
+        Gateway -->|/auth| Auth[svc-auth]
+        Gateway -->|/patients| Patients[svc-patients]
+        Gateway -->|/files| Files[svc-files]
+        Gateway -->|/appointments| Appointments[svc-appointments]
+
+        Files -.->|Evento Audit| RabbitMQ
+        Auth -.->|Evento Audit| RabbitMQ
+
+        RabbitMQ --> Audit[svc-audit]
+        RabbitMQ --> Notifications[svc-notifications]
+    end
+
+    subgraph "Infraestructura Local (Docker)"
+        Auth --> DB_PG[(Postgres Auth)]
+        Patients --> DB_PG2[(Postgres Patients)]
+        Patients --> Redis[(Redis Cache)]
+        Audit --> Mongo[(MongoDB)]
+    end
 ```
 
-For example:
+### 🧩 Catálogo de Servicios
 
-```sh
-npx nx build myproject
+El proyecto está organizado dentro de la carpeta `apps/`.
+
+| Servicio | Tipo | Descripción | Puerto Local |
+| :--- | :--- | :--- | :--- |
+| **api-gateway** | Gateway | Punto de entrada. Enruta tráfico y valida JWT | `3000` |
+| **svc-auth** | Microservicio | Gestión de usuarios, roles, login y registro | `3001` |
+| **svc-patients** | Microservicio | CRUD de pacientes y fichas médicas (Redis Cache) | `3002` |
+| **svc-appointments** | Microservicio | Gestión de citas y agenda médica | `3003` |
+| **svc-files** | Microservicio | Subida y descarga de radiografías y documentos | `3004` |
+| **svc-history** | Microservicio | Control de versiones de historias clínicas | `3005` |
+| **svc-audit** | Worker | Auditoría y registro de eventos | N/A |
+| **svc-notifications** | Worker | Envío de correos y alertas | N/A |
+| **svc-backup** | Job | Respaldos automáticos de base de datos | N/A |
+| **emr-frontend** | Frontend | Aplicación web para doctores y administradores | `4200` |
+
+### 📚 Librerías Compartidas (`libs/`)
+
+* **`shared-dtos`**: Contiene DTOs (Data Transfer Objects) e interfaces compartidas entre frontend y backend para garantizar tipado estricto y consistencia.
+
+---
+
+## 🛠️ Stack Tecnológico
+
+* **Entorno de Ejecución:** Node.js v18+
+* **Monorepo:** Nx
+* **Lenguaje:** TypeScript
+* **Backend:** NestJS
+* **Bases de Datos (Docker):**
+    * 🐘 **PostgreSQL:** Datos relacionales (Auth, Pacientes, Citas)
+    * 🍃 **MongoDB:** Logs y Auditoría
+    * 🔴 **Redis:** Caché y sesiones
+* **Mensajería:** 🐰 RabbitMQ (eventos asíncronos)
+
+---
+
+## 🚀 Guía de Inicio Rápido
+
+### 1️⃣ Prerrequisitos
+Asegúrate de tener instalado:
+* [Node.js (LTS)](https://nodejs.org/)
+* [Docker Desktop](https://www.docker.com/products/docker-desktop) (debe estar en ejecución)
+* Git
+
+### 2️⃣ Instalación de Dependencias
+
+```bash
+npm install
 ```
 
-These targets are either [inferred automatically](https://nx.dev/concepts/inferred-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) or defined in the `project.json` or `package.json` files.
+### 3️⃣ Levantar Infraestructura (Docker)
 
-[More about running tasks in the docs &raquo;](https://nx.dev/features/run-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+Esto iniciará PostgreSQL, Redis, RabbitMQ y MongoDB.
 
-## Add new projects
-
-While you could add new projects to your workspace manually, you might want to leverage [Nx plugins](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) and their [code generation](https://nx.dev/features/generate-code?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) feature.
-
-To install a new plugin you can use the `nx add` command. Here's an example of adding the React plugin:
-```sh
-npx nx add @nx/react
+```bash
+docker-compose up -d
 ```
 
-Use the plugin's generator to create new projects. For example, to create a new React app or library:
+### 4️⃣ Configuración de Entorno (`.env`)
 
-```sh
-# Generate an app
-npx nx g @nx/react:app demo
+Crea un archivo `.env` en la raíz con las siguientes variables base:
 
-# Generate a library
-npx nx g @nx/react:lib some-lib
+```env
+DB_HOST=localhost
+DB_PORT=5432
+DB_USER=postgres
+DB_PASS=root
+
+REDIS_HOST=localhost
+
+RABBITMQ_URL=amqp://guest:guest@localhost:5672
 ```
 
-You can use `npx nx list` to get a list of installed plugins. Then, run `npx nx list <plugin-name>` to learn about more specific capabilities of a particular plugin. Alternatively, [install Nx Console](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) to browse plugins and generators in your IDE.
+### 5️⃣ Ejecutar los Microservicios
 
-[Learn more about Nx plugins &raquo;](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) | [Browse the plugin registry &raquo;](https://nx.dev/plugin-registry?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+Tienes dos opciones para correr el proyecto:
 
-## Set up CI!
-
-### Step 1
-
-To connect to Nx Cloud, run the following command:
-
-```sh
-npx nx connect
+**🔹 Opción A: Ejecutar todo el sistema**
+```bash
+npx nx run-many --target=serve --all --parallel=10
 ```
 
-Connecting to Nx Cloud ensures a [fast and scalable CI](https://nx.dev/ci/intro/why-nx-cloud?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects) pipeline. It includes features such as:
+**🔹 Opción B: Ejecutar servicios específicos**
+```bash
+# API Gateway
+npx nx serve api-gateway
 
-- [Remote caching](https://nx.dev/ci/features/remote-cache?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task distribution across multiple machines](https://nx.dev/ci/features/distribute-task-execution?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Automated e2e test splitting](https://nx.dev/ci/features/split-e2e-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Task flakiness detection and rerunning](https://nx.dev/ci/features/flaky-tasks?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
+# Servicio de Pacientes
+npx nx serve svc-patients
 
-### Step 2
-
-Use the following command to configure a CI workflow for your workspace:
-
-```sh
-npx nx g ci-workflow
+# Frontend
+npx nx serve emr-frontend
 ```
-
-[Learn more about Nx on CI](https://nx.dev/ci/intro/ci-with-nx#ready-get-started-with-your-provider?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Install Nx Console
-
-Nx Console is an editor extension that enriches your developer experience. It lets you run tasks, generate code, and improves code autocompletion in your IDE. It is available for VSCode and IntelliJ.
-
-[Install Nx Console &raquo;](https://nx.dev/getting-started/editor-setup?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-## Useful links
-
-Learn more:
-
-- [Learn more about this workspace setup](https://nx.dev/getting-started/intro#learn-nx?utm_source=nx_project&amp;utm_medium=readme&amp;utm_campaign=nx_projects)
-- [Learn about Nx on CI](https://nx.dev/ci/intro/ci-with-nx?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [Releasing Packages with Nx release](https://nx.dev/features/manage-releases?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-- [What are Nx plugins?](https://nx.dev/concepts/nx-plugins?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
-
-And join the Nx community:
-- [Discord](https://go.nx.dev/community)
-- [Follow us on X](https://twitter.com/nxdevtools) or [LinkedIn](https://www.linkedin.com/company/nrwl)
-- [Our Youtube channel](https://www.youtube.com/@nxdevtools)
-- [Our blog](https://nx.dev/blog?utm_source=nx_project&utm_medium=readme&utm_campaign=nx_projects)
